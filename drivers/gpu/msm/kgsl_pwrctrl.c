@@ -30,6 +30,7 @@
 #define KGSL_PWRFLAGS_AXI_ON   2
 #define KGSL_PWRFLAGS_IRQ_ON   3
 
+#define GPU_SWFI_LATENCY        3
 #define UPDATE_BUSY_VAL		1000000
 #define UPDATE_BUSY		50
 
@@ -1290,9 +1291,8 @@ void kgsl_pwrctrl_wake(struct kgsl_device *device)
 		/* Re-enable HW access */
 		mod_timer(&device->idle_timer,
 				jiffies + device->pwrctrl.interval_timeout);
-		if (device->pwrctrl.restore_slumber == false)
-			pm_qos_update_request(&device->pwrctrl.pm_qos_req_dma,
-				device->pwrctrl.pm_qos_latency);
+		pm_qos_update_request(&device->pm_qos_req_dma,
+					GPU_SWFI_LATENCY);
 	case KGSL_STATE_ACTIVE:
 		kgsl_pwrctrl_request_state(device, KGSL_STATE_NONE);
 		break;
