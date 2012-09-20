@@ -3567,37 +3567,6 @@ static int msmfb_notify_update(struct fb_info *info, void __user *argp)
 	return (ret > 0) ? 0 : ret;
 }
 
-int msmfb_validate_start_req(struct mdp_histogram_start_req *req)
-{
-	if (req->frame_cnt >= MSM_FB_HISTOGRAM_FRAME_COUNT_MAX) {
-		pr_err("%s invalid req frame_cnt\n", __func__);
-		return -EINVAL;
-	}
-	if (req->bit_mask >= MSM_FB_HISTOGRAM_BIT_MASK_MAX) {
-		pr_err("%s invalid req bit mask\n", __func__);
-		return -EINVAL;
-	}
-	if (req->block != MDP_BLOCK_DMA_P ||
-		req->num_bins != MSM_FB_HISTOGRAM_BIN_NUM) {
-		pr_err("msmfb_histogram_start invalid request\n");
-		return -EINVAL;
-	}
-	return 0;
-}
-
-int msmfb_validate_scale_config(struct mdp_bl_scale_data *data)
-{
-	if (data->scale > MSM_FB_BL_SCALE_MAX) {
-		pr_err("%s invalid bl_scale\n", __func__);
-		return -EINVAL;
-	}
-	if (data->min_lvl > MSM_FB_BL_LEVEL_MAX) {
-		pr_err("%s invalid bl_min_lvl\n", __func__);
-		return -EINVAL;
-	}
-	return 0;
-}
-
 static int msmfb_handle_pp_ioctl(struct msmfb_mdp_pp *pp_ptr)
 {
 	int ret = -1;
