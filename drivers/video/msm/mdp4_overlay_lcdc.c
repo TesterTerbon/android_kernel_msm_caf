@@ -459,6 +459,8 @@ ssize_t mdp4_lcdc_show_event(struct device *dev,
 			diff = 1000;
 		usleep(diff);
 	}
+	if (!lcdc_enabled)
+		return 0;
 
 	spin_lock_irqsave(&vctrl->spin_lock, flags);
 	if (vctrl->wait_vsync_cnt == 0)

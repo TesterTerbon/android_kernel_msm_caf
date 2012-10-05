@@ -474,6 +474,8 @@ ssize_t mdp4_dsi_video_show_event(struct device *dev,
 			diff = 1000;
 		usleep(diff);
 	}
+	if (!dsi_video_enabled)
+		return 0;
 
 	spin_lock_irqsave(&vctrl->spin_lock, flags);
 	if (vctrl->wait_vsync_cnt == 0)
