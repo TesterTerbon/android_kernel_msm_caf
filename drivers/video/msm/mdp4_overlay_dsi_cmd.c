@@ -712,7 +712,7 @@ ssize_t mdp4_dsi_cmd_show_event(struct device *dev,
 		msecs_to_jiffies(VSYNC_PERIOD * 4));
 	if (ret <= 0) {
 		vctrl->wait_vsync_cnt = 0;
-		vctrl->vsync_time = ktime_get();
+		return -EBUSY;
 	}
 
 	spin_lock_irqsave(&vctrl->spin_lock, flags);
