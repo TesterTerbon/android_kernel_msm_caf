@@ -314,7 +314,6 @@ int mdp_lcdc_on(struct platform_device *pdev)
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
-
 	return ret;
 }
 
