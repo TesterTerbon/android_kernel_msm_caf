@@ -642,6 +642,20 @@ static int mdp4_dtv_start(struct msm_fb_data_type *mfd)
 	return 0;
 }
 
+static int mdp4_dtv_stop(struct msm_fb_data_type *mfd)
+{
+	int cndx = 0;
+	struct vsycn_ctrl *vctrl;
+
+	vctrl = &vsync_ctrl_db[cndx];
+	if (vctrl->base_pipe == NULL)
+		return -EINVAL;
+
+	MDP_OUTP(MDP_BASE + DTV_BASE, 0);
+
+	return 0;
+}
+
 int mdp4_dtv_on(struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd;
@@ -685,9 +699,6 @@ int mdp4_dtv_on(struct platform_device *pdev)
 		pr_warn("%s: panel_next_on failed", __func__);
 
 	atomic_set(&vctrl->suspend, 0);
-
-	mutex_unlock(&mfd->dma->ov_mutex);
-
 	pr_info("%s:\n", __func__);
 
 	return ret;

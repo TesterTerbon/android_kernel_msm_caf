@@ -3282,6 +3282,7 @@ static int mdp_probe(struct platform_device *pdev)
 
 	pdev_list[pdev_list_cnt++] = pdev;
 	mdp4_extn_disp = 0;
+
         /* vsync_init call not required for mdp3
          * vsync_init call required for mdp4 targets*/
 	if ((mfd->vsync_init != NULL) || (mdp_rev < MDP_REV_40)) {
