@@ -5987,7 +5987,6 @@ static int msmsdcc_pm_suspend(struct device *dev)
 
 	/* This flag must not be set if system is entering into suspend */
 	host->pending_resume = false;
-
 	return rc;
 }
 
