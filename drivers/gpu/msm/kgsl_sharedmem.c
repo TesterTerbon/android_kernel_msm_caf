@@ -571,8 +571,8 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	memdesc->pagetable = pagetable;
 	memdesc->ops = &kgsl_page_alloc_ops;
 
-	memdesc->sglen_alloc = sglen_alloc;
-	memdesc->sg = kgsl_sg_alloc(memdesc->sglen_alloc);
+	memdesc->sglen = sglen;
+	memdesc->sg = kgsl_sg_alloc(sglen);
 
 	if (memdesc->sg == NULL) {
 		ret = -ENOMEM;
@@ -599,7 +599,7 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 
 	kmemleak_not_leak(memdesc->sg);
 
-	sg_init_table(memdesc->sg, memdesc->sglen_alloc);
+	sg_init_table(memdesc->sg, sglen);
 
 	len = size;
 
