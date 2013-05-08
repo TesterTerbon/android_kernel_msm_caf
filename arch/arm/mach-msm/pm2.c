@@ -1700,6 +1700,9 @@ static int __init msm_pm_init(void)
 		l2x0_base_addr = MSM_L2CC_BASE;
 	}
 
+	apps_pwr_dwn   = APPS_PWRDOWN;
+	idle_v7_start_ptr = virt_start_ptr;
+
 #ifdef CONFIG_MSM_MEMORY_LOW_POWER_MODE
 	/* The wakeup_reason field is overloaded during initialization time
 	   to signal Modem that Apps will control the low power modes of
