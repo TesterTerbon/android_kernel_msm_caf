@@ -37,6 +37,18 @@
 
 #define MODULE_NAME "msm-cpr"
 
+/**
+ * Convert the Delay time to Timer Count Register
+ * e.g if frequency is 19200 kHz and delay required is
+ * 20000us, so timer count will be 19200 * 20000 / 1000
+ */
+#define TIMER_COUNT(freq, delay) ((freq * delay) / 1000)
+#define ALL_CPR_IRQ 0x3F
+#define STEP_QUOT_MAX 25
+#define STEP_QUOT_MIN 12
+
+void __iomem *virt_start_ptr;
+
 /* Need platform device handle for suspend and resume APIs */
 static struct platform_device *cpr_pdev;
 
@@ -717,6 +729,12 @@ static int __devinit msm_cpr_probe(struct platform_device *pdev)
 	cpr = devm_kzalloc(&pdev->dev, sizeof(struct msm_cpr), GFP_KERNEL);
 	if (!cpr)
 		return -ENOMEM;
+	}
+
+	virt_start_ptr = ioremap_nocache(MSM8625_NON_CACHE_MEM, SZ_2K);
+	msm_cpr_debug(MSM_CPR_DEBUG_CONFIG,
+		"virt_start_ptr = %x\n", (uint32_t) virt_start_ptr);
+	memset(virt_start_ptr, 0x0, SZ_2K);
 
 	/* Initialize platform_data */
 	cpr->config = pdata;
