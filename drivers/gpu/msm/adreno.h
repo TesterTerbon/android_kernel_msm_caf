@@ -234,6 +234,9 @@ void adreno_dump_rb(struct kgsl_device *device, const void *buf,
 unsigned int adreno_ft_detect(struct kgsl_device *device,
 						unsigned int *prev_reg_val);
 
+int adreno_ft_init_sysfs(struct kgsl_device *device);
+void adreno_ft_uninit_sysfs(struct kgsl_device *device);
+
 static inline int adreno_is_a200(struct adreno_device *adreno_dev)
 {
 	return (adreno_dev->gpurev == ADRENO_REV_A200);
