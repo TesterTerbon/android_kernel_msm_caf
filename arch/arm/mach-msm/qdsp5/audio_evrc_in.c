@@ -280,11 +280,6 @@ static int audevrc_in_enable(struct audio_evrc_in *audio)
 			return -ENODEV;
 		}
 
-		/*update aurec session info in audpreproc layer*/
-		audio->session_info.session_id = audio->enc_id;
-		audio->session_info.sampling_freq =
-			convert_samp_index(audio->samp_rate);
-		audpreproc_update_audrec_info(&audio->session_info);
 	}
 
 	if (msm_adsp_enable(audio->audrec)) {
@@ -318,10 +313,6 @@ static int audevrc_in_disable(struct audio_evrc_in *audio)
 		msm_adsp_disable(audio->audrec);
 		if (audio->mode == MSM_AUD_ENC_MODE_TUNNEL) {
 			audpreproc_disable(audio->enc_id, audio);
-			/*reset the sampling frequency information at
-			audpreproc layer*/
-			audio->session_info.sampling_freq = 0;
-			audpreproc_update_audrec_info(&audio->session_info);
 			audmgr_disable(&audio->audmgr);
 		}
 	}

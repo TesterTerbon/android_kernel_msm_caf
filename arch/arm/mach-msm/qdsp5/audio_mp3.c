@@ -2223,8 +2223,6 @@ static int audio_open(struct inode *inode, struct file *file)
 					0x%08x\n", (int)audio);
 			if (!(file->f_flags & O_NONBLOCK))
 				goto err;
-			else
-				goto resource_err;
 		}
 	}
 
@@ -2238,8 +2236,6 @@ static int audio_open(struct inode *inode, struct file *file)
 			audmgr_close(&audio->audmgr);
 		if (!(file->f_flags & O_NONBLOCK))
 			goto err;
-		else
-			goto resource_err;
 	}
 
 	rc = rmt_get_resource(audio);
@@ -2251,8 +2247,6 @@ static int audio_open(struct inode *inode, struct file *file)
 		msm_adsp_put(audio->audplay);
 		if (!(file->f_flags & O_NONBLOCK))
 			goto err;
-		else
-			goto resource_err;
 	}
 
 	if (file->f_flags & O_NONBLOCK) {
