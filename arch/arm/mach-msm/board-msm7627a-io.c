@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -165,7 +165,6 @@ static struct platform_device kp_pdev_8625 = {
 #define LED_GPIO_PDM 96
 
 #define MXT_TS_IRQ_GPIO         48
-#define MXT_SKU6_TS_IRQ_GPIO	11
 #define MXT_TS_RESET_GPIO       26
 #define MAX_VKEY_LEN		100
 
@@ -292,7 +291,7 @@ static const u8 mxt_config_data_evt[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0,
 	/* T40 Object */
-	0, 0, 0, 0, 0,
+	17, 0, 0, 30, 30,
 	/* T42 Object */
 	3, 20, 45, 40, 128, 0, 0, 0,
 	/* T46 Object */
@@ -774,6 +773,7 @@ static struct platform_device tricolor_leds_pdev = {
 
 void __init msm7627a_add_io_devices(void)
 {
+#if 0 //ARUBA Temp
 	/* touchscreen */
 	if (machine_is_msm7625a_surf() || machine_is_msm7625a_ffa()) {
 		atmel_ts_pdata.min_x = 0;
@@ -816,9 +816,9 @@ void __init qrd7627a_add_io_devices(void)
 					synaptic_i2c_clearpad3k,
 					ARRAY_SIZE(synaptic_i2c_clearpad3k));
 	} else if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() ||
-		machine_is_msm7627a_evt() || machine_is_msm8625_evt()) {
+			machine_is_msm8625_evt()) {
 		/* Use configuration data for EVT */
-		if (machine_is_msm8625_evt() || machine_is_msm7627a_evt()) {
+		if (machine_is_msm8625_evt()) {
 			mxt_config_array[0].config = mxt_config_data_evt;
 			mxt_config_array[0].config_length =
 					ARRAY_SIZE(mxt_config_data_evt);
@@ -827,19 +827,12 @@ void __init qrd7627a_add_io_devices(void)
 			mxt_vkey_setup();
 		}
 
-		/* set irq gpio for sku6 TSTS device */
-		if (machine_is_msm7627a_evt()) {
-			mxt_platform_data.irq_gpio = MXT_SKU6_TS_IRQ_GPIO;
-			mxt_device_info[0].irq =
-					MSM_GPIO_TO_INT(MXT_SKU6_TS_IRQ_GPIO);
-		}
-
-		rc = gpio_tlmm_config(GPIO_CFG(mxt_platform_data.irq_gpio,
-				0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
+		rc = gpio_tlmm_config(GPIO_CFG(MXT_TS_IRQ_GPIO, 0,
+				GPIO_CFG_INPUT, GPIO_CFG_PULL_UP,
 				GPIO_CFG_8MA), GPIO_CFG_ENABLE);
 		if (rc) {
 			pr_err("%s: gpio_tlmm_config for %d failed\n",
-				__func__, mxt_platform_data.irq_gpio);
+				__func__, MXT_TS_IRQ_GPIO);
 		}
 
 		rc = gpio_tlmm_config(GPIO_CFG(MXT_TS_RESET_GPIO, 0,
@@ -868,19 +861,20 @@ void __init qrd7627a_add_io_devices(void)
 #endif
 
 	/* keypad */
-	if (machine_is_msm8625_evt() || machine_is_msm7627a_evt())
+	if (machine_is_msm8625_evt())
 		kp_matrix_info_8625.keymap = keymap_8625_evt;
 
 	if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() ||
-		machine_is_msm7627a_evt() || machine_is_msm8625_evt())
+			machine_is_msm8625_evt())
 		platform_device_register(&kp_pdev_8625);
 	else if (machine_is_msm7627a_qrd3() || machine_is_msm8625_qrd7())
 		platform_device_register(&kp_pdev_sku3);
 
 	/* leds */
 	if (machine_is_msm7627a_evb() || machine_is_msm8625_evb() ||
-		machine_is_msm7627a_evt() || machine_is_msm8625_evt()) {
+						machine_is_msm8625_evt()) {
 		platform_device_register(&pmic_mpp_leds_pdev);
 		platform_device_register(&tricolor_leds_pdev);
 	}
+#endif
 }

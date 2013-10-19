@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -76,7 +76,6 @@
 #define I2C_PIN_CTL       0x15
 #define I2C_NORMAL        0x40
 
-
 static struct platform_device msm_wlan_ar6000_pm_device = {
 	.name           = "wlan_ar6000_pm_dev",
 	.id             = -1,
@@ -132,15 +131,14 @@ static struct msm_i2c_platform_data msm_gsbi1_qup_i2c_pdata = {
 
 #ifdef CONFIG_ARCH_MSM7X27A
 #define MSM_PMEM_MDP_SIZE       0x2300000
-#define MSM_PMEM_ADSP_SIZE      0x1300000
-#define CAMERA_ZSL_SIZE		(SZ_1M * 60)
+#define MSM_PMEM_ADSP_SIZE      0x1200000
 
-#ifdef CONFIG_ION_MSM
+#define MSM_ION_AUDIO_SIZE	(MSM_PMEM_AUDIO_SIZE + PMEM_KERNEL_EBI1_SIZE)
+#define MSM_ION_CAMERA_SIZE	MSM_PMEM_ADSP_SIZE
+#define MSM_ION_SF_SIZE		MSM_PMEM_MDP_SIZE
 #define MSM_ION_HEAP_NUM	4
+#ifdef CONFIG_ION_MSM
 static struct platform_device ion_dev;
-static int msm_ion_camera_size;
-static int msm_ion_audio_size;
-static int msm_ion_sf_size;
 #endif
 #endif
 
@@ -277,7 +275,6 @@ static struct msm_otg_platform_data msm_otg_pdata = {
 
 static struct msm_hsusb_gadget_platform_data msm_gadget_pdata = {
 	.is_phy_status_timer_on = 1,
-	.prop_chg = 0,
 };
 
 #ifdef CONFIG_SERIAL_MSM_HS
@@ -397,9 +394,6 @@ static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
 	.cached = 1,
 	.memory_type = MEMTYPE_EBI1,
-	.request_region = request_fmem_c_region,
-	.release_region = release_fmem_c_region,
-	.reusable = 1,
 };
 
 static struct platform_device android_pmem_adsp_device = {
@@ -500,14 +494,6 @@ static struct platform_device msm_adc_device = {
 	},
 };
 
-static struct fmem_platform_data fmem_pdata;
-
-static struct platform_device fmem_device = {
-	.name = "fmem",
-	.id = 1,
-	.dev = { .platform_data = &fmem_pdata },
-};
-
 #define GPIO_VREG_INIT(_id, _reg_name, _gpio_label, _gpio, _active_low) \
 	[GPIO_VREG_ID_##_id] = { \
 		.init_data = { \
@@ -579,7 +565,6 @@ static struct platform_device *common_devices[] __initdata = {
 	&asoc_msm_dai0,
 	&asoc_msm_dai1,
 	&msm_adc_device,
-	&fmem_device,
 #ifdef CONFIG_ION_MSM
 	&ion_dev,
 #endif
@@ -633,17 +618,6 @@ static int __init pmem_audio_size_setup(char *p)
 }
 early_param("pmem_audio_size", pmem_audio_size_setup);
 
-static void fix_sizes(void)
-{
-	if (get_ddr_size() > SZ_512M)
-		pmem_adsp_size = CAMERA_ZSL_SIZE;
-#ifdef CONFIG_ION_MSM
-	msm_ion_camera_size = pmem_adsp_size;
-	msm_ion_audio_size = (MSM_PMEM_AUDIO_SIZE + PMEM_KERNEL_EBI1_SIZE);
-	msm_ion_sf_size = pmem_mdp_size;
-#endif
-}
-
 #ifdef CONFIG_ION_MSM
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 static struct ion_co_heap_pdata co_ion_pdata = {
@@ -658,7 +632,6 @@ static struct ion_co_heap_pdata co_ion_pdata = {
  */
 static struct ion_platform_data ion_pdata = {
 	.nr = MSM_ION_HEAP_NUM,
-	.has_outer_cache = 1,
 	.heaps = {
 		{
 			.id	= ION_SYSTEM_HEAP_ID,
@@ -671,7 +644,9 @@ static struct ion_platform_data ion_pdata = {
 			.id	= ION_CAMERA_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
 			.name	= ION_CAMERA_HEAP_NAME,
+			.size	= MSM_ION_CAMERA_SIZE,
 			.memory_type = ION_EBI_TYPE,
+			.has_outer_cache = 1,
 			.extra_data = (void *)&co_ion_pdata,
 		},
 		/* PMEM_AUDIO */
@@ -679,7 +654,9 @@ static struct ion_platform_data ion_pdata = {
 			.id	= ION_AUDIO_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
 			.name	= ION_AUDIO_HEAP_NAME,
+			.size	= MSM_ION_AUDIO_SIZE,
 			.memory_type = ION_EBI_TYPE,
+			.has_outer_cache = 1,
 			.extra_data = (void *)&co_ion_pdata,
 		},
 		/* PMEM_MDP = SF */
@@ -687,7 +664,9 @@ static struct ion_platform_data ion_pdata = {
 			.id	= ION_SF_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
 			.name	= ION_SF_HEAP_NAME,
+			.size	= MSM_ION_SF_SIZE,
 			.memory_type = ION_EBI_TYPE,
+			.has_outer_cache = 1,
 			.extra_data = (void *)&co_ion_pdata,
 		},
 #endif
@@ -726,32 +705,9 @@ static void __init size_pmem_devices(void)
 {
 #ifdef CONFIG_ANDROID_PMEM
 #ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
-	unsigned int i;
-	unsigned int reusable_count = 0;
-
 	android_pmem_adsp_pdata.size = pmem_adsp_size;
 	android_pmem_pdata.size = pmem_mdp_size;
 	android_pmem_audio_pdata.size = pmem_audio_size;
-
-	fmem_pdata.size = 0;
-	fmem_pdata.align = PAGE_SIZE;
-
-	/* Find pmem devices that should use FMEM (reusable) memory.
-	 */
-	for (i = 0; i < ARRAY_SIZE(pmem_pdata_array); ++i) {
-		struct android_pmem_platform_data *pdata = pmem_pdata_array[i];
-
-		if (!reusable_count && pdata->reusable)
-			fmem_pdata.size += pdata->size;
-
-		reusable_count += (pdata->reusable) ? 1 : 0;
-
-		if (pdata->reusable && reusable_count > 1) {
-			pr_err("%s: Too many PMEM devices specified as reusable. PMEM device %s was not configured as reusable.\n",
-				__func__, pdata->name);
-			pdata->reusable = 0;
-		}
-	}
 #endif
 #endif
 }
@@ -778,30 +734,19 @@ static void __init reserve_pmem_memory(void)
 #endif
 }
 
-static void __init size_ion_devices(void)
-{
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-	ion_pdata.heaps[1].size = msm_ion_camera_size;
-	ion_pdata.heaps[2].size = msm_ion_audio_size;
-	ion_pdata.heaps[3].size = msm_ion_sf_size;
-#endif
-}
-
 static void __init reserve_ion_memory(void)
 {
 #if defined(CONFIG_ION_MSM) && defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
-	msm7627a_reserve_table[MEMTYPE_EBI1].size += msm_ion_camera_size;
-	msm7627a_reserve_table[MEMTYPE_EBI1].size += msm_ion_audio_size;
-	msm7627a_reserve_table[MEMTYPE_EBI1].size += msm_ion_sf_size;
+	msm7627a_reserve_table[MEMTYPE_EBI1].size += MSM_ION_CAMERA_SIZE;
+	msm7627a_reserve_table[MEMTYPE_EBI1].size += MSM_ION_AUDIO_SIZE;
+	msm7627a_reserve_table[MEMTYPE_EBI1].size += MSM_ION_SF_SIZE;
 #endif
 }
 
 static void __init msm7627a_calculate_reserve_sizes(void)
 {
-	fix_sizes();
 	size_pmem_devices();
 	reserve_pmem_memory();
-	size_ion_devices();
 	reserve_ion_memory();
 }
 
@@ -957,7 +902,6 @@ static void __init msm_pm_init(void)
 				ARRAY_SIZE(msm8625_pm_data));
 		BUG_ON(msm_pm_boot_init(&msm_pm_8625_boot_pdata));
 		msm8x25_spm_device_init();
-		msm_pm_register_cpr_ops();
 	}
 }
 
@@ -997,7 +941,7 @@ static void __init msm_qrd_init(void)
 #endif
 
 	msm7627a_camera_init();
-	qrd7627a_add_io_devices();
+//	qrd7627a_add_io_devices(); // ARUBA Temp
 	msm7x25a_kgsl_3d0_init();
 	msm8x25_kgsl_3d0_init();
 }
@@ -1066,14 +1010,4 @@ MACHINE_START(MSM8625_EVT, "QRD MSM8625 EVT")
 	.timer		= &msm_timer,
 	.init_early	= qrd7627a_init_early,
 	.handle_irq	= gic_handle_irq,
-MACHINE_END
-MACHINE_START(MSM7627A_EVT, "QRD MSM7627A EVT")
-	.atag_offset	= 0x100,
-	.map_io		= msm_common_io_init,
-	.reserve	= msm7627a_reserve,
-	.init_irq	= msm_init_irq,
-	.init_machine	= msm_qrd_init,
-	.timer		= &msm_timer,
-	.init_early	= qrd7627a_init_early,
-	.handle_irq	= vic_handle_irq,
 MACHINE_END
