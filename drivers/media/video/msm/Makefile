@@ -65,6 +65,10 @@ ifneq ($(CONFIG_MSM_CAMERA_V4L2),y)
   obj-$(CONFIG_WEBCAM_OV7692_QRD) += ov7692_qrd.o
 endif
 obj-$(CONFIG_QS_S5K4E1) += qs_s5k4e1.o qs_s5k4e1_reg.o
+obj-$(CONFIG_SR300PC20) += sr300pc20.o sec_cam_pmic.o
+obj-$(CONFIG_S5K5CCAF) += s5k5ccaf.o sec_cam_pmic.o
+obj-$(CONFIG_S5K4ECGX) += s5k4ecgx.o 
+obj-$(CONFIG_MT9V113) += mt9v113.o
 obj-$(CONFIG_VB6801) += vb6801.o
 obj-$(CONFIG_IMX072) += imx072.o imx072_reg.o
 obj-$(CONFIG_OV5640) += ov5640.o
