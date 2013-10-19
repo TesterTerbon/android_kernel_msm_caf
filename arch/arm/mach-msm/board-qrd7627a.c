@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -136,16 +136,15 @@ static struct msm_i2c_platform_data msm_gsbi1_qup_i2c_pdata = {
 };
 
 #ifdef CONFIG_ARCH_MSM7X27A
-#define MSM_PMEM_MDP_SIZE       0x1B00000
+#define MSM_PMEM_MDP_SIZE       0x2300000
 #define MSM_PMEM_ADSP_SIZE      0x1200000
-#define CAMERA_ZSL_SIZE		(SZ_1M * 60)
 
-#ifdef CONFIG_ION_MSM
+#define MSM_ION_AUDIO_SIZE	(MSM_PMEM_AUDIO_SIZE + PMEM_KERNEL_EBI1_SIZE)
+#define MSM_ION_CAMERA_SIZE	MSM_PMEM_ADSP_SIZE
+#define MSM_ION_SF_SIZE		MSM_PMEM_MDP_SIZE
 #define MSM_ION_HEAP_NUM	4
+#ifdef CONFIG_ION_MSM
 static struct platform_device ion_dev;
-static int msm_ion_camera_size;
-static int msm_ion_audio_size;
-static int msm_ion_sf_size;
 #endif
 #endif
 
@@ -694,30 +693,6 @@ static struct platform_device msm_adc_device = {
 	},
 };
 
-#ifdef CONFIG_MSM_RTB
-static struct msm_rtb_platform_data msm7627a_rtb_pdata = {
-	.size = SZ_1M,
-};
-
-static int __init msm_rtb_set_buffer_size(char *p)
-{
-	int s;
-
-	s = memparse(p, NULL);
-	msm7627a_rtb_pdata.size = ALIGN(s, SZ_4K);
-	return 0;
-}
-early_param("msm_rtb_size", msm_rtb_set_buffer_size);
-
-struct platform_device msm7627a_rtb_device = {
-	.name = "msm_rtb",
-	.id   = -1,
-	.dev  = {
-		 .platform_data = &msm7627a_rtb_pdata,
-	},
-};
-#endif
-
 #define GPIO_VREG_INIT(_id, _reg_name, _gpio_label, _gpio, _active_low) \
 	[GPIO_VREG_ID_##_id] = { \
 		.init_data = { \
@@ -789,9 +764,6 @@ static struct platform_device *common_devices[] __initdata = {
 	&asoc_msm_dai0,
 	&asoc_msm_dai1,
 	&msm_adc_device,
-#ifdef CONFIG_MSM_RTB
-	&msm7627a_rtb_device,
-#endif
 #ifdef CONFIG_ION_MSM
 	&ion_dev,
 #endif
@@ -845,17 +817,6 @@ static int __init pmem_audio_size_setup(char *p)
 }
 early_param("pmem_audio_size", pmem_audio_size_setup);
 
-static void fix_sizes(void)
-{
-	if (get_ddr_size() > SZ_512M)
-		pmem_adsp_size = CAMERA_ZSL_SIZE;
-#ifdef CONFIG_ION_MSM
-	msm_ion_camera_size = pmem_adsp_size;
-	msm_ion_audio_size = (MSM_PMEM_AUDIO_SIZE + PMEM_KERNEL_EBI1_SIZE);
-	msm_ion_sf_size = pmem_mdp_size;
-#endif
-}
-
 #ifdef CONFIG_ION_MSM
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 static struct ion_co_heap_pdata co_ion_pdata = {
@@ -868,7 +829,9 @@ static struct ion_co_heap_pdata co_ion_pdata = {
  * These heaps are listed in the order they will be allocated.
  * Don't swap the order unless you know what you are doing!
  */
-struct ion_platform_heap qrd7627a_heaps[] = {
+static struct ion_platform_data ion_pdata = {
+	.nr = MSM_ION_HEAP_NUM,
+	.heaps = {
 		{
 			.id	= ION_SYSTEM_HEAP_ID,
 			.type	= ION_HEAP_TYPE_SYSTEM,
@@ -880,7 +843,9 @@ struct ion_platform_heap qrd7627a_heaps[] = {
 			.id	= ION_CAMERA_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
 			.name	= ION_CAMERA_HEAP_NAME,
+			.size	= MSM_ION_CAMERA_SIZE,
 			.memory_type = ION_EBI_TYPE,
+			.has_outer_cache = 1,
 			.extra_data = (void *)&co_ion_pdata,
 		},
 		/* PMEM_AUDIO */
@@ -888,7 +853,9 @@ struct ion_platform_heap qrd7627a_heaps[] = {
 			.id	= ION_AUDIO_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
 			.name	= ION_AUDIO_HEAP_NAME,
+			.size	= MSM_ION_AUDIO_SIZE,
 			.memory_type = ION_EBI_TYPE,
+			.has_outer_cache = 1,
 			.extra_data = (void *)&co_ion_pdata,
 		},
 		/* PMEM_MDP = SF */
@@ -896,7 +863,9 @@ struct ion_platform_heap qrd7627a_heaps[] = {
 			.id	= ION_SF_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
 			.name	= ION_SF_HEAP_NAME,
+			.size	= MSM_ION_SF_SIZE,
 			.memory_type = ION_EBI_TYPE,
+			.has_outer_cache = 1,
 			.extra_data = (void *)&co_ion_pdata,
 		},
 #endif
@@ -980,30 +949,19 @@ static void __init reserve_pmem_memory(void)
 #endif
 }
 
-static void __init size_ion_devices(void)
-{
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-	ion_pdata.heaps[1].size = msm_ion_camera_size;
-	ion_pdata.heaps[2].size = msm_ion_audio_size;
-	ion_pdata.heaps[3].size = msm_ion_sf_size;
-#endif
-}
-
 static void __init reserve_ion_memory(void)
 {
 #if defined(CONFIG_ION_MSM) && defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
-	msm7627a_reserve_table[MEMTYPE_EBI1].size += msm_ion_camera_size;
-	msm7627a_reserve_table[MEMTYPE_EBI1].size += msm_ion_audio_size;
-	msm7627a_reserve_table[MEMTYPE_EBI1].size += msm_ion_sf_size;
+	msm7627a_reserve_table[MEMTYPE_EBI1].size += MSM_ION_CAMERA_SIZE;
+	msm7627a_reserve_table[MEMTYPE_EBI1].size += MSM_ION_AUDIO_SIZE;
+	msm7627a_reserve_table[MEMTYPE_EBI1].size += MSM_ION_SF_SIZE;
 #endif
 }
 
 static void __init msm7627a_calculate_reserve_sizes(void)
 {
-	fix_sizes();
 	size_pmem_devices();
 	reserve_pmem_memory();
-	size_ion_devices();
 	reserve_ion_memory();
 	reserve_rtb_memory();
 }
@@ -1159,7 +1117,6 @@ static void __init msm_pm_init(void)
 				ARRAY_SIZE(msm8625_pm_data));
 		BUG_ON(msm_pm_boot_init(&msm_pm_8625_boot_pdata));
 		msm8x25_spm_device_init();
-		msm_pm_register_cpr_ops();
 	}
 }
 
@@ -1199,7 +1156,7 @@ static void __init msm_qrd_init(void)
 #endif
 
 	msm7627a_camera_init();
-	qrd7627a_add_io_devices();
+//	qrd7627a_add_io_devices(); // ARUBA Temp
 	msm7x25a_kgsl_3d0_init();
 	msm8x25_kgsl_3d0_init();
 }
