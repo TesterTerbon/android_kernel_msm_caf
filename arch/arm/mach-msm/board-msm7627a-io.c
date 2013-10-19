@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -773,6 +773,7 @@ static struct platform_device tricolor_leds_pdev = {
 
 void __init msm7627a_add_io_devices(void)
 {
+#if 0 //ARUBA Temp
 	/* touchscreen */
 	if (machine_is_msm7625a_surf() || machine_is_msm7625a_ffa()) {
 		atmel_ts_pdata.min_x = 0;
@@ -872,4 +873,5 @@ void __init qrd7627a_add_io_devices(void)
 		platform_device_register(&pmic_mpp_leds_pdev);
 		platform_device_register(&tricolor_leds_pdev);
 	}
+#endif
 }
