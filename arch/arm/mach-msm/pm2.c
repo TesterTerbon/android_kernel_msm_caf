@@ -517,8 +517,17 @@ static void msm_pm_configure_top_csr(void)
 	unsigned int cpu;
 	int i;
 
-	/* Initialize all the SPM registers */
-	msm_spm_reinit();
+	base_ptr = ioremap_nocache(0x00902000, SZ_4K*2);
+	if (!base_ptr)
+		return;
+
+	/* bring the core1 out of reset */
+	__raw_writel(0x3, base_ptr);
+	mb();
+	/*
+	 * override DBGNOPOWERDN and program the GDFS
+	 * count val
+	 */
 
 	*(uint32_t *)(virt_start_ptr + 0x30) = 0x12;
 
@@ -587,7 +596,6 @@ static void msm_pm_config_hw_after_power_up(void)
 			 * enable the SCU while coming out of power
 			 * collapse.
 			 */
-			scu_enable(MSM_SCU_BASE);
 			/*
 			 * Program the top csr to put the core1 into GDFS.
 			 */
