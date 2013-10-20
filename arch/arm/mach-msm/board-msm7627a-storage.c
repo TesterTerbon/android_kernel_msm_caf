@@ -22,10 +22,10 @@
 #include "pm.h"
 #include "board-msm7627a.h"
 
-#ifndef ATH_POLLING
+/*#ifndef ATH_POLLING
 extern int register_wlan_status_notify(void (*callback)(int card_present, void *dev_id), void *dev_id);
 extern unsigned int wlan_status(struct device *dev);
-#endif
+#endif*/
 
 #if (defined(CONFIG_MMC_MSM_SDC1_SUPPORT)\
 	|| defined(CONFIG_MMC_MSM_SDC2_SUPPORT)\
@@ -334,10 +334,10 @@ static struct mmc_platform_data sdc2_plat_data = {
 #if 0  /* def CONFIG_MMC_MSM_SDIO_SUPPORT */
 	.sdiowakeup_irq = MSM_GPIO_TO_INT(66),
 #endif
-#ifndef ATH_POLLING
+/*#ifndef ATH_POLLING
 	.status = wlan_status,
 	.register_status_notify = register_wlan_status_notify,
-#endif /* ATH_POLLING */
+#endif ATH_POLLING */
 	.msmsdcc_fmin   = 144000,
 	.msmsdcc_fmid   = 24576000,
 	.msmsdcc_fmax   = 49152000,

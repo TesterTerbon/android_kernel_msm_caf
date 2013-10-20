@@ -33,6 +33,8 @@
 #include <mach/gpio_nevis.h>
 #elif defined(CONFIG_MACH_ROY)
 #include <mach/gpio_roy.h>
+#elif defined(CONFIG_MACH_JENA)
+#include <mach/gpio_jena.h>
 #elif defined(CONFIG_MACH_KYLEPLUS_CTC)//kyleplus
 #include <mach/gpio_aruba.h>
 #endif
@@ -1709,7 +1711,7 @@ void __init msm_fb_add_devices(void)
 //	if (machine_is_msm7625a_surf() || machine_is_msm7x27a_surf() ||
 //			machine_is_msm8625_surf() || machine_is_msm7627a_qrd3()
 //			|| machine_is_msm8625_qrd7())
-		msm_fb_register_device("lcdc", &lcdc_pdata);
+//		msm_fb_register_device("lcdc", &lcdc_pdata);
 #endif
 
 #ifdef CONFIG_FB_MSM_MIPI_DSI
