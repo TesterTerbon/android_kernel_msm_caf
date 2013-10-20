@@ -487,7 +487,7 @@ static void configure_top_csr(void)
 	void __iomem *base_ptr;
 	unsigned int value = 0;
 
-	base_ptr = core1_reset_base();
+	base_ptr = ioremap_nocache(0x00902000, SZ_4K*2);
 	if (!base_ptr)
 		return;
 
@@ -565,7 +565,6 @@ static void msm_pm_config_hw_after_power_up(void)
 			 * enable the SCU while coming out of power
 			 * collapse.
 			 */
-			scu_enable(MSM_SCU_BASE);
 			/*
 			 * Program the top csr to put the core1 into GDFS.
 			 */
