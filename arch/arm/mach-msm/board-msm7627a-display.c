@@ -1378,10 +1378,14 @@ void __init msm_fb_add_devices(void)
 	}
 
 	msm_fb_register_device("mdp", &mdp_pdata);
-	if (machine_is_msm7625a_surf() || machine_is_msm7x27a_surf() ||
-			machine_is_msm8625_surf() || machine_is_msm7627a_qrd3()
-			|| machine_is_msm8625_qrd7())
-		msm_fb_register_device("lcdc", &lcdc_pdata);
+
+#ifdef CONFIG_FB_MSM_LCDC
+//	if (machine_is_msm7625a_surf() || machine_is_msm7x27a_surf() ||
+//			machine_is_msm8625_surf() || machine_is_msm7627a_qrd3()
+//			|| machine_is_msm8625_qrd7())
+//		msm_fb_register_device("lcdc", &lcdc_pdata);
+#endif
+
 #ifdef CONFIG_FB_MSM_MIPI_DSI
 	msm_fb_register_device("mipi_dsi", &mipi_dsi_pdata);
 #endif
