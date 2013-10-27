@@ -39,6 +39,156 @@ static int vnode_count;
 module_param(msm_camera_v4l2_nr, uint, 0644);
 MODULE_PARM_DESC(msm_camera_v4l2_nr, "videoX start number, -1 is autodetect");
 
+static long msm_server_send_v4l2_evt(void *evt);
+static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
+	unsigned int notification, void *arg);
+int msm_camera_antibanding =  CAMERA_ANTIBANDING_50HZ; /*default*/
+
+int msm_camera_antibanding_get (void) {
+	return msm_camera_antibanding;
+}
+
+ssize_t msm_camera_antibanding_show (struct device *dev, struct device_attribute *attr, char *buf) {
+	int count;
+
+	count = sprintf(buf, "%d", msm_camera_antibanding);
+	pr_info("%s : antibanding is %d \n", __func__, msm_camera_antibanding);
+
+	return count;
+}
+
+ssize_t msm_camera_antibanding_store (struct device *dev, struct device_attribute *attr, const char *buf, size_t size) {
+	int tmp = 0;
+
+	sscanf(buf, "%d", &tmp);
+	if ((CAMERA_ANTIBANDING_50HZ == tmp) || (CAMERA_ANTIBANDING_60HZ == tmp)) {
+		msm_camera_antibanding = tmp;
+		pr_info("%s : antibanding is %d\n",__func__, msm_camera_antibanding);
+	}
+
+	return size;
+}
+
+static struct device_attribute msm_camera_antibanding_attr = {
+	.attr = {
+		.name = "anti-banding",
+		.mode = (S_IRUSR|S_IRGRP | S_IWUSR|S_IWGRP)},
+	.show = msm_camera_antibanding_show,
+	.store = msm_camera_antibanding_store
+};
+
+static void msm_queue_init(struct msm_device_queue *queue, const char *name)
+{
+	D("%s\n", __func__);
+	spin_lock_init(&queue->lock);
+	queue->len = 0;
+	queue->max = 0;
+	queue->name = name;
+	INIT_LIST_HEAD(&queue->list);
+	init_waitqueue_head(&queue->wait);
+}
+
+static void msm_enqueue(struct msm_device_queue *queue,
+			struct list_head *entry)
+{
+	unsigned long flags;
+	spin_lock_irqsave(&queue->lock, flags);
+	queue->len++;
+	if (queue->len > queue->max) {
+		queue->max = queue->len;
+		pr_info("%s: queue %s new max is %d\n", __func__,
+			queue->name, queue->max);
+	}
+	list_add_tail(entry, &queue->list);
+	wake_up(&queue->wait);
+	D("%s: woke up %s\n", __func__, queue->name);
+	spin_unlock_irqrestore(&queue->lock, flags);
+}
+
+static void msm_drain_eventq(struct msm_device_queue *queue)
+{
+	unsigned long flags;
+	struct msm_queue_cmd *qcmd;
+	struct msm_isp_event_ctrl *isp_event;
+	spin_lock_irqsave(&queue->lock, flags);
+	while (!list_empty(&queue->list)) {
+		qcmd = list_first_entry(&queue->list,
+			struct msm_queue_cmd, list_eventdata);
+		list_del_init(&qcmd->list_eventdata);
+		isp_event =
+			(struct msm_isp_event_ctrl *)
+			qcmd->command;
+		if (isp_event->isp_data.ctrl.value != NULL)
+			kfree(isp_event->isp_data.ctrl.value);
+		kfree(qcmd->command);
+		free_qcmd(qcmd);
+	}
+	spin_unlock_irqrestore(&queue->lock, flags);
+}
+
+static int32_t msm_find_free_queue(void)
+{
+	int i;
+	for (i = 0; i < MAX_NUM_ACTIVE_CAMERA; i++) {
+		struct msm_cam_server_queue *queue;
+		queue = &g_server_dev.server_queue[i];
+		if (!queue->queue_active)
+			return i;
+	}
+	return -EINVAL;
+}
+
+void msm_setup_v4l2_event_queue(struct v4l2_fh *eventHandle,
+		      struct video_device *pvdev)
+{
+	v4l2_fh_init(eventHandle, pvdev);
+	v4l2_fh_add(eventHandle);
+}
+
+void msm_destroy_v4l2_event_queue(struct v4l2_fh *eventHandle)
+{
+	v4l2_fh_del(eventHandle);
+	v4l2_fh_exit(eventHandle);
+}
+
+uint32_t msm_camera_get_mctl_handle(void)
+{
+	uint32_t i;
+	if ((g_server_dev.mctl_handle_cnt << 8) == 0)
+		g_server_dev.mctl_handle_cnt++;
+	for (i = 0; i < MAX_NUM_ACTIVE_CAMERA; i++) {
+		if (g_server_dev.mctl[i].handle == 0) {
+			g_server_dev.mctl[i].handle =
+				(++g_server_dev.mctl_handle_cnt) << 8 | i;
+			memset(&g_server_dev.mctl[i].mctl,
+				   0, sizeof(g_server_dev.mctl[i].mctl));
+			return g_server_dev.mctl[i].handle;
+		}
+	}
+	return 0;
+}
+
+struct msm_cam_media_controller *msm_camera_get_mctl(uint32_t handle)
+{
+	uint32_t mctl_index;
+	mctl_index = handle & 0xff;
+	if ((mctl_index < MAX_NUM_ACTIVE_CAMERA) &&
+		(g_server_dev.mctl[mctl_index].handle == handle))
+		return &g_server_dev.mctl[mctl_index].mctl;
+	return NULL;
+}
+
+void msm_camera_free_mctl(uint32_t handle)
+{
+	uint32_t mctl_index;
+	mctl_index = handle & 0xff;
+	if ((mctl_index < MAX_NUM_ACTIVE_CAMERA) &&
+		(g_server_dev.mctl[mctl_index].handle == handle))
+		g_server_dev.mctl[mctl_index].handle = 0;
+	else
+		pr_err("%s: invalid free handle\n", __func__);
+}
+
 /* callback function from all subdevices of a msm_cam_v4l2_device */
 static void msm_cam_v4l2_subdev_notify(struct v4l2_subdev *sd,
 				unsigned int notification, void *arg)
@@ -1539,3 +1689,153 @@ failure:
 }
 EXPORT_SYMBOL(msm_sensor_register);
 
+static ssize_t rear_camera_type_show(struct device *dev,
+    struct device_attribute *attr, char *buf,
+    size_t count)
+{
+#if defined(CONFIG_S5K4ECGX)
+	char cam_type[] = "SLSI_S5K4ECGX\n";
+#elif defined(CONFIG_S5K5CCGX)
+	char cam_type[] = "SLSI_S5K5CCGX\n";
+#elif defined(CONFIG_SR300PC20)
+	char cam_type[] = "SF_SR300PC20\n";
+#else
+	char cam_type[] = "SOC_N\n";
+#endif
+
+	return snprintf(buf, sizeof(cam_type), "%s", cam_type);
+}
+
+static ssize_t front_camera_type_show(struct device *dev,
+    struct device_attribute *attr, char *buf,
+    size_t count)
+{
+#if defined(CONFIG_SR030PC50)
+	char cam_type[] = "SF_SR030PC50\n";
+#elif defined(CONFIG_SR200PC20)
+	char cam_type[] = "SF_SR200PC20";
+#else
+	char cam_type[] = "SOC_N\n";
+#endif
+
+	return snprintf(buf, sizeof(cam_type), "%s", cam_type);
+}
+
+static DEVICE_ATTR(rear_camtype, S_IRUGO, rear_camera_type_show, NULL);
+static DEVICE_ATTR(front_camtype, S_IRUGO, front_camera_type_show, NULL);
+
+static ssize_t rear_camera_firmware_show(struct device *dev,
+    struct device_attribute *attr, char *buf,
+    size_t count)
+{
+#if defined(CONFIG_S5K4ECGX)
+	char cam_fw[] = "SLSI_S5K4ECGX\n";
+#elif defined(CONFIG_S5K5CCGX)
+	char cam_fw[] = "SLSI_S5K5CCGX\n";
+#elif defined(CONFIG_SR300PC20)
+	char cam_fw[] = "SF_SR300PC20\n";
+#else
+	char cam_fw[] = "N\n";
+#endif
+
+	return snprintf(buf, sizeof(cam_fw), "%s", cam_fw);
+}
+
+static ssize_t front_camera_firmware_show(struct device *dev,
+    struct device_attribute *attr, char *buf,
+    size_t count)
+{
+#if defined(CONFIG_SR030PC50)
+	char cam_fw[] = "SF_SR030PC50\n";
+#elif defined(CONFIG_SR200PC20)
+	char cam_fw[] = "SF_SR200PC20\n";
+#else
+	char cam_fw[] = "N\n";
+#endif
+
+	return snprintf(buf, sizeof(cam_fw), "%s", cam_fw);
+}
+
+static DEVICE_ATTR(rear_camfw, 0664, rear_camera_firmware_show, NULL);
+static DEVICE_ATTR(front_camfw, 0664, front_camera_firmware_show, NULL);
+
+static int __devinit msm_camera_probe(struct platform_device *pdev)
+{
+	int rc = 0, i;
+	/*for now just create a config 0 node
+	  put logic here later to know how many configs to create*/
+	g_server_dev.config_info.num_config_nodes = 1;
+
+	rc = msm_isp_init_module(g_server_dev.config_info.num_config_nodes);
+	if (rc < 0) {
+		pr_err("Failed to initialize isp\n");
+		return rc;
+	}
+
+	if (!msm_class) {
+		rc = alloc_chrdev_region(&msm_devno, 0,
+		g_server_dev.config_info.num_config_nodes+1, "msm_camera");
+		if (rc < 0) {
+			pr_err("%s: failed to allocate chrdev: %d\n", __func__,
+			rc);
+			return rc;
+		}
+
+		msm_class = class_create(THIS_MODULE, "msm_camera");
+		if (IS_ERR(msm_class)) {
+			rc = PTR_ERR(msm_class);
+			pr_err("%s: create device class failed: %d\n",
+			__func__, rc);
+			return rc;
+		}
+	}
+
+	D("creating server and config nodes\n");
+	rc = msm_setup_server_dev(pdev);
+	if (rc < 0) {
+		pr_err("%s: failed to create server dev: %d\n", __func__,
+		rc);
+		return rc;
+	}
+
+	for (i = 0; i < g_server_dev.config_info.num_config_nodes; i++) {
+		rc = msm_setup_config_dev(i, "config");
+		if (rc < 0) {
+			pr_err("%s:failed to create config dev: %d\n",
+			 __func__, rc);
+			return rc;
+		}
+	}
+
+	msm_isp_register(&g_server_dev);
+	return rc;
+}
+
+static int __exit msm_camera_exit(struct platform_device *pdev)
+{
+	msm_isp_unregister(&g_server_dev);
+	return 0;
+}
+
+
+static struct platform_driver msm_cam_server_driver = {
+	.probe = msm_camera_probe,
+	.remove = msm_camera_exit,
+	.driver = {
+		.name = "msm_cam_server",
+		.owner = THIS_MODULE,
+	},
+};
+
+static int __init msm_camera_init(void)
+{
+	return platform_driver_register(&msm_cam_server_driver);
+}
+
+static void __exit msm_cam_server_exit(void)
+{
+	platform_driver_unregister(&msm_cam_server_driver);
+}
+
+module_init(msm_camera_init);
+module_exit(msm_cam_server_exit);
