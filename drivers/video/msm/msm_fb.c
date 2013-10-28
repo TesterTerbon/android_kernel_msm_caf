@@ -2906,10 +2906,6 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 
 	ret = mdp4_overlay_play(info, &req);
 
-	if (unset_bl_level && !bl_updated)
-		schedule_delayed_work(&mfd->backlight_worker,
-				backlight_duration);
-
 	return ret;
 }
 
