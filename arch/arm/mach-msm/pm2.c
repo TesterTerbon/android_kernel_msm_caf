@@ -515,22 +515,14 @@ static void msm_pm_configure_top_csr(void)
 	unsigned int cpu;
 	int i;
 
-	base_ptr = ioremap_nocache(0x00902000, SZ_4K*2);
-	if (!base_ptr)
-		return;
+	/* Initialize all the SPM registers */
+	msm_spm_reinit();
 
-	/* bring the core1 out of reset */
-	__raw_writel(0x3, base_ptr);
+	/* enable TCSR for core1 */
+	value = __raw_readl((MSM_CFG_CTL_BASE + MPA5_CFG_CTL_REG));
+	value |= BIT(22);
+	__raw_writel(value,  MSM_CFG_CTL_BASE + MPA5_CFG_CTL_REG);
 	mb();
-	/*
-	 * override DBGNOPOWERDN and program the GDFS
-	 * count val
-	 */
-
-	for_each_possible_cpu(cpu) {
-		/* skip for C0 */
-		if (!cpu)
-			continue;
 
 		base_ptr = core_reset_base(cpu);
 		if (!base_ptr)
@@ -564,9 +556,13 @@ static void msm_pm_configure_top_csr(void)
 						mpa5_cfg_ctl[cpu/2]);
 		mb();
 
-		__raw_writel(0x0, base_ptr);
-		mb();
-	}
+	/* Disable TSCR for core0 */
+	value = __raw_readl((MSM_CFG_CTL_BASE + MPA5_CFG_CTL_REG));
+	value &= ~BIT(22);
+	__raw_writel(value,  MSM_CFG_CTL_BASE + MPA5_CFG_CTL_REG);
+	mb();
+	__raw_writel(0x0, base_ptr);
+	mb();
 }
 
 /*
@@ -919,19 +915,6 @@ static int msm_pm_power_collapse
 	msm_pm_smem_data->sleep_time = sleep_delay;
 	msm_pm_smem_data->resources_used = sleep_limit;
 
-	saved_acpuclk_rate = acpuclk_power_collapse();
-	MSM_PM_DPRINTK(MSM_PM_DEBUG_CLOCK, KERN_INFO,
-		"%s(): change clock rate (old rate = %lu)\n", __func__,
-		saved_acpuclk_rate);
-
-	if (saved_acpuclk_rate == 0) {
-		ret = -EAGAIN;
-		goto acpu_set_clock_fail;
-	}
-
-	msm_sirc_enter_sleep();
-	msm_gpio_enter_sleep(from_idle);
-
 	/* Enter PWRC/PWRC_SUSPEND */
 
 	if (from_idle)
@@ -967,11 +950,6 @@ static int msm_pm_power_collapse
 		goto power_collapse_early_exit;
 	}
 
-<<<<<<< HEAD
-	*(uint32_t *)(virt_start_ptr + 0x30) = 0x3;
-
-=======
->>>>>>> parent of 4642323... msm: pm2: Add memory markers across PM driver
 	/* DEM Master in RSA */
 
 	MSM_PM_DEBUG_PRINT_STATE("msm_pm_power_collapse(): PWRC RSA");
@@ -1007,8 +985,6 @@ static int msm_pm_power_collapse
 
 	msm_pm_boot_config_before_pc(smp_processor_id(),
 			virt_to_phys(msm_pm_collapse_exit));
-
-	*(uint32_t *)(virt_start_ptr + 0x30) = 0x4;
 
 #ifdef CONFIG_VFP
 	if (from_idle)
@@ -1093,18 +1069,6 @@ static int msm_pm_power_collapse
 		local_fiq_enable();
 	}
 
-<<<<<<< HEAD
-	/* restore the AHB clock registers */
-	if (cpu_is_msm8625q()) {
-		writel_relaxed(msm8x25q_ahb.sel, A11S_CLK_SEL_ADDR);
-		writel_relaxed(msm8x25q_ahb.cntl, A11S_CLK_CNTL_ADDR);
-		mb();
-	}
-
-	*(uint32_t *)(virt_start_ptr + 0x30) = 0x11;
-
-=======
->>>>>>> parent of 4642323... msm: pm2: Add memory markers across PM driver
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_SUSPEND | MSM_PM_DEBUG_POWER_COLLAPSE,
 		KERN_INFO,
 		"%s(): msm_pm_collapse returned %d\n", __func__, collapsed);
@@ -1189,18 +1153,6 @@ static int msm_pm_power_collapse
 		goto power_collapse_restore_gpio_bail;
 	}
 
-<<<<<<< HEAD
-	*(uint32_t *)(virt_start_ptr + 0x30) = 0x16;
-=======
-	MSM_PM_DPRINTK(MSM_PM_DEBUG_CLOCK, KERN_INFO,
-		"%s(): restore clock rate to %lu\n", __func__,
-		saved_acpuclk_rate);
-	if (acpuclk_set_rate(smp_processor_id(), saved_acpuclk_rate,
-			SETRATE_PC) < 0)
-		printk(KERN_ERR "%s(): failed to restore clock rate(%lu)\n",
-			__func__, saved_acpuclk_rate);
->>>>>>> parent of 4642323... msm: pm2: Add memory markers across PM driver
-
 	/* DEM Master == RUN */
 
 	MSM_PM_DEBUG_PRINT_STATE("msm_pm_power_collapse(): WFPI RUN");
@@ -1222,7 +1174,7 @@ static int msm_pm_power_collapse
 
 	smd_sleep_exit();
 
-	if (cpu_is_msm8625() || cpu_is_msm8625q()) {
+	if (cpu_is_msm8625()) {
 		ret = msm_spm_set_low_power_mode(MSM_SPM_MODE_CLOCK_GATING,
 									false);
 		WARN_ON(ret);
@@ -1285,42 +1237,19 @@ power_collapse_restore_gpio_bail:
 
 	MSM_PM_DEBUG_PRINT_STATE("msm_pm_power_collapse(): RUN");
 
-<<<<<<< HEAD
-	*(uint32_t *)(virt_start_ptr + 0x30) = 0x23;
-=======
-	MSM_PM_DPRINTK(MSM_PM_DEBUG_CLOCK, KERN_INFO,
-		"%s(): restore clock rate to %lu\n", __func__,
-		saved_acpuclk_rate);
-	if (acpuclk_set_rate(smp_processor_id(), saved_acpuclk_rate,
-			SETRATE_PC) < 0)
-		printk(KERN_ERR "%s(): failed to restore clock rate(%lu)\n",
-			__func__, saved_acpuclk_rate);
->>>>>>> parent of 4642323... msm: pm2: Add memory markers across PM driver
-
 	if (collapsed)
 		smd_sleep_exit();
 
 	if (msm_cpr_ops)
 		msm_cpr_ops->cpr_resume();
 
-<<<<<<< HEAD
-	*(uint32_t *)(virt_start_ptr + 0x30) = 0x24;
-
-=======
 power_collapse_bail:
->>>>>>> parent of 4642323... msm: pm2: Add memory markers across PM driver
-	if (cpu_is_msm8625() || cpu_is_msm8625q()) {
+	if (cpu_is_msm8625()) {
 		ret = msm_spm_set_low_power_mode(MSM_SPM_MODE_CLOCK_GATING,
 									false);
 		WARN_ON(ret);
 	}
 
-<<<<<<< HEAD
-power_collapse_bail:
-	*(uint32_t *)(virt_start_ptr + 0x30) = 0x25;
-	*(uint32_t *)(virt_start_ptr + 0x34) = 0x0;
-=======
->>>>>>> parent of 4642323... msm: pm2: Add memory markers across PM driver
 	return ret;
 }
 
@@ -1339,73 +1268,6 @@ static int __ref msm_pm_power_collapse_standalone(bool from_idle)
 	MSM_PM_DPRINTK(MSM_PM_DEBUG_SUSPEND|MSM_PM_DEBUG_POWER_COLLAPSE,
 		KERN_INFO, "%s()\n", __func__);
 
-<<<<<<< HEAD
-	cpu = smp_processor_id();
-
-	switch (cpu) {
-	case 0:
-		*(uint32_t *)(virt_start_ptr + 0x10) = 0x1;
-		*(uint32_t *)(virt_start_ptr + 0x20) = 0x1;
-
-		/* clear C0 jump location */
-		*(uint32_t *)(virt_start_ptr + 0x40) = 0xDEADBEEF;
-
-		break;
-	case 1:
-		*(uint32_t *)(virt_start_ptr + 0x14) = 0x1;
-
-		/*
-		 * update "0x24" as below:
-		 * idleSPC = 0x1
-		 * hotplug = 0x2
-		 */
-		if (from_idle)
-			*(uint32_t *)(virt_start_ptr + 0x24) = 0x1;
-		else
-			/* clear this in platsmp-8625.c */
-			*(uint32_t *)(virt_start_ptr + 0x24) = 0x2;
-
-		/* clear C1 jump location */
-		*(uint32_t *)(virt_start_ptr + 0x44) = 0xDEADBEEF;
-		break;
-	case 2:
-		*(uint32_t *)(virt_start_ptr + 0x18) = 0x1;
-
-		/*
-		 * update "0x28" as below:
-		 * idleSPC = 0x1
-		 * hotplug = 0x2
-		 */
-		if (from_idle)
-			*(uint32_t *)(virt_start_ptr + 0x28) = 0x1;
-		else
-			/* clear this in platsmp-8625.c */
-			*(uint32_t *)(virt_start_ptr + 0x28) = 0x2;
-
-		/* clear C2 location */
-		*(uint32_t *)(virt_start_ptr + 0x48) = 0xDEADBEEF;
-		break;
-	case 3:
-		*(uint32_t *)(virt_start_ptr + 0x1C) = 0x1;
-
-		/*
-		 * update "0x2C" as below:
-		 * idleSPC = 0x1
-		 * hotplug = 0x2
-		 */
-		if (from_idle)
-			*(uint32_t *)(virt_start_ptr + 0x2C) = 0x1;
-		else
-			/* clear this in platsmp-8625.c */
-			*(uint32_t *)(virt_start_ptr + 0x2C) = 0x2;
-
-		/* clear C3 jump location */
-		*(uint32_t *)(virt_start_ptr + 0x4C) = 0xDEADBEEF;
-		break;
-	}
-
-=======
->>>>>>> parent of 4642323... msm: pm2: Add memory markers across PM driver
 	ret = msm_spm_set_low_power_mode(MSM_SPM_MODE_POWER_COLLAPSE, false);
 	WARN_ON(ret);
 
@@ -1897,8 +1759,6 @@ static int __init msm_pm_init(void)
 
 		l2x0_base_addr = MSM_L2CC_BASE;
 	}
-
-	idle_v7_start_ptr = virt_start_ptr;
 
 #ifdef CONFIG_MSM_MEMORY_LOW_POWER_MODE
 	/* The wakeup_reason field is overloaded during initialization time

@@ -414,7 +414,6 @@ static int msm_fb_probe(struct platform_device *pdev)
 
 	pdev_list[pdev_list_cnt++] = pdev;
 	msm_fb_create_sysfs(pdev);
-	msm_fb_resolution_sysfs(pdev);
 	return 0;
 }
 
