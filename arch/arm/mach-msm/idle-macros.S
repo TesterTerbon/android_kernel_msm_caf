@@ -68,17 +68,20 @@ skip_enable\@:
 .macro DO_CACHE_OPERATION, operation, l2_enable
 	ldr     r2, =l2x0_base_addr
 	ldr	r2, [r2]
-	ldr     r0, =0xff
+	ldr     r0, =0xffff
 	str     r0, [r2, #\operation]
 wait\@:
 	ldr	r0, [r2, #\operation]
-	ldr	r1, =0xff
+	ldr	r1, =0xffff
 	ands    r0, r0, r1
 	bne     wait\@
-	dsb
+l2x_sync\@:
 	mov	r0, #0x0
 	str	r0, [r2, #L2X0_CACHE_SYNC]
-	dsb
+sync\@:
+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
+	ands	r0, r0, #0x1
+	bne	sync\@
 	mov     r1, #\l2_enable
 	str     r1, [r2, #L2X0_CTRL]
 .endm
