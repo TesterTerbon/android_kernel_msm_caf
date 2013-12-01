@@ -38,6 +38,10 @@
 #define	NO_TTY_RX_BUFF	1
 #define	NO_TTY_MUTEX_VNET	1
 
+#ifndef CONFIG_SAMSUNG_CTC_CW
+#define CONFIG_SAMSUNG_CTC_CW
+#endif
+
 /* Multiple PDP */
 struct pdp_arg {
 	unsigned char id;
@@ -267,7 +271,7 @@ struct pdp_info {
 		/* Virtual serial interface */
 		struct {
 			/* CSD, ROUTER, GPS, XGPS, SMD, CPLOG, LOOPBACK */
-			struct tty_driver tty_driver[7];
+			struct tty_driver tty_driver[MAX_PDP_CONTEXT];
 			int refcount;
 			struct tty_struct *tty_table[1];
 			struct ktermios *termios[1];
@@ -325,6 +329,14 @@ static int pdp_mux(struct pdp_info *dev, const void *data, size_t len);
 static int pdp_demux(void);
 static inline struct pdp_info *pdp_get_serdev(const char *name);
 
+#ifdef CONFIG_SAMSUNG_CTC_CW
+/* Added by Venkatesh GR SISO Received PPP Data is sent to ppp */
+static int XanCwReceivedWiFiData(int nDestChannelID,u8 *pi8_RecvdBuf,int nRecvdBuflen);
+static int XanCwSendToXanadu(int nSrcChannelID,int nDestChannelID,u8 *pi8_RecvdBuf,int nRecvdBuflen);
+#endif
+
+/* ... */
+
 static struct tty_driver *get_tty_driver_by_id(struct pdp_info *dev)
 {
 	int index = 0;
@@ -351,6 +363,17 @@ static struct tty_driver *get_tty_driver_by_id(struct pdp_info *dev)
 	case 31:
 		index = 6;
 		break;
+	case 7:
+		index = 7;
+		break;
+#ifdef CONFIG_SAMSUNG_CTC_CW		
+	case 36:
+		index = 8;
+		break;
+	case 41:
+		index = 9;
+		break;
+#endif
 	default:
 		index = 0;
 	}
@@ -384,6 +407,17 @@ static int get_minor_start_index(int id)
 	case 31:
 		start = 6;
 		break;
+	case 7:
+		start = 7;
+		break;
+#ifdef CONFIG_SAMSUNG_CTC_CW		
+	case 36:
+		start = 8;
+		break;
+	case 41:
+		start = 9;
+		break;
+#endif
 	default:
 		start = 0;
 	}
@@ -792,8 +826,7 @@ static void vnet_defer_xmit(struct work_struct *data)
 	vnet_start_xmit_flag = 0;
 
 	up(&pdp_txlock);
-	if (pdp_tx_flag == 0)
-		netif_wake_queue(net);
+	netif_wake_queue(net);
 }
 
 static int vnet_start_xmit(struct sk_buff *skb, struct net_device *net)
@@ -840,7 +873,7 @@ static int vnet_start_xmit(struct sk_buff *skb, struct net_device *net)
 	dev->vn_dev.stats.rx_packets++;
 	dev->vn_dev.stats.rx_bytes += skb->len;
 #else
-	if (vnet_start_xmit_flag != 0 || pdp_tx_flag == 1)
+	if (vnet_start_xmit_flag != 0)
 		return NETDEV_TX_BUSY;
 
 	vnet_start_xmit_flag = 1;
@@ -1064,6 +1097,10 @@ static int vs_open(struct tty_struct *tty, struct file *filp)
 	tty->low_latency = 0;
 	dev->vs_dev.tty = tty;
 
+	#ifdef CONFIG_SAMSUNG_CTC_CW
+	dev->vs_dev.refcount++; //Merged from Cooper VE Codebase
+	#endif
+
 	return 0;
 }
 
@@ -1105,7 +1142,9 @@ static void vs_close(struct tty_struct *tty, struct file *filp)
 	default:
 		break;
 	}
-
+	#ifdef CONFIG_SAMSUNG_CTC_CW
+	dev->vs_dev.refcount--; //Merged from Cooper VE Codebase
+	#endif
 }
 
 static int vs_write(struct tty_struct *tty, const unsigned char *buf, int count)
@@ -1116,6 +1155,49 @@ static int vs_write(struct tty_struct *tty, const unsigned char *buf, int count)
     mutex_lock(&pdp_lock);
 	*/
 	dev = (struct pdp_info *)tty->driver_data;
+
+#ifdef CONFIG_SAMSUNG_CTC_CW
+	/* Added by Venkatesh GR, SISO For CDMA+WiFi requirements -- Start*/
+	if(strcmp(dev->vs_dev.tty_name,"ttyCWPPP") == 0)
+	{
+		//int nLoopCnt=0;
+		printk("write_to_dpram ttyCWPPP event received : data len = %d\n",count);
+
+	   	/*printk("Data Start\n");
+		for(nLoopCnt=0;(nLoopCnt<count && (nLoopCnt + 5)<count) ;nLoopCnt += 5)
+		{
+		   printk("%x %x %x %x %x\n",buf[nLoopCnt], buf[nLoopCnt +1],buf[nLoopCnt + 2],buf[nLoopCnt + 3], buf[nLoopCnt + 4]);
+		}
+		if(nLoopCnt<count)
+		{
+			for(;(nLoopCnt<count) ;nLoopCnt++)
+			{
+			   printk("%x",buf[nLoopCnt]);
+			}
+		   	printk("\nData END\n");
+		}*/
+
+		{
+			int nSrcChannelID=0;
+			nSrcChannelID = dev->id;
+
+			/* Send the Buffer Received From PPPD to Xanadu */
+			ret = XanCwSendToXanadu(nSrcChannelID,41,buf,count);
+		}
+	}
+	else if(strcmp(dev->vs_dev.tty_name,"ttyCWXAN") == 0)
+	{
+		int nDestChannelID=36;
+
+	   	printk("Received Data From Xanadu Sending to PPPD\n");
+		/* Send the Buffer Received From PPPD to Xanadu */
+		ret = XanCwReceivedWiFiData(nDestChannelID,buf,count);
+	}
+	/* Added by Venkatesh GR, SISO For CDMA+WiFi requirements -- End*/
+	else
+	{
+#endif	
+
 	ret = pdp_mux(dev, buf, count);
 
 	if (ret == 0)
@@ -1123,7 +1205,9 @@ static int vs_write(struct tty_struct *tty, const unsigned char *buf, int count)
 	/*
 	mutex_unlock(&pdp_lock);
 	*/
-
+#ifdef CONFIG_SAMSUNG_CTC_CW
+	}
+#endif	
 	return ret;
 }
 
@@ -1236,7 +1320,7 @@ static int multipdp_vs_read(struct pdp_info *dev, char *buf, size_t len)
 			return 0;
 		}
 
-		if (ret > 0 && dev->vs_dev.tty != NULL) {
+		if (ret > 0 && dev->vs_dev.tty != NULL && dev->vs_dev.refcount) {
 			if (dev->id == 29) {
 				skb = alloc_skb(len, GFP_ATOMIC);
 				if (unlikely(!skb))
@@ -1292,7 +1376,7 @@ static int multipdp_vs_read(struct pdp_info *dev, char *buf, size_t len)
 		if (dev->vs_dev.tty == NULL)
 			pr_err("[MULTIPDP] TTY is NULL : (2)~ !!!!\n");
 
-		if (ret > 0 && dev->vs_dev.tty != NULL) {
+		if (ret > 0 && dev->vs_dev.tty != NULL && dev->vs_dev.refcount) {
 			if (dev->id == 29) {
 				skb = alloc_skb(len, GFP_ATOMIC);
 
@@ -1491,6 +1575,77 @@ static inline struct pdp_info *pdp_get_dev(u8 id)
 	return NULL;
 }
 
+#ifdef CONFIG_SAMSUNG_CTC_CW
+/* Added by Venkatesh GR SISO Received PPP Data is sent to ppp */
+static int XanCwReceivedWiFiData(int nDestChannelID,u8 *pi8_RecvdBuf,int nRecvdBuflen)
+{
+	int ret = 0;
+	struct pdp_info *dev = NULL;
+
+	if(pi8_RecvdBuf == NULL)
+	{
+		printk("XanCwReceivedWiFiData: input buffer Error\n");
+		return 0;
+	}
+	
+	dev = pdp_get_dev(nDestChannelID);
+	if(dev == NULL)
+	{
+		printk("XanCwReceivedWiFiData: pdp_get_dev returned NULL\n");
+		return 0;
+	}
+
+	if (dev->vs_dev.tty != NULL && dev->vs_dev.refcount) 
+	{
+		ret = tty_insert_flip_string(dev->vs_dev.tty, (u8 *)pi8_RecvdBuf, nRecvdBuflen);
+		tty_flip_buffer_push(dev->vs_dev.tty);
+	}
+
+	return ret;
+}
+
+/* Added by Venkatesh GR SISO Received PPP Data from pppd to Xanadu */
+static int XanCwSendToXanadu(int nSrcChannelID,int nDestChannelID,u8 *pi8_RecvdBuf,int nRecvdBuflen)
+{
+	int ret = 0;
+	struct pdp_info *dev = NULL;
+	int nXanChannelID = nDestChannelID;
+
+	printk("XanCwSendToXanadu: Entered %d\n", nRecvdBuflen);
+	if(pi8_RecvdBuf == NULL)
+	{
+		printk("XanCwSendToXanadu: input buffer Error\n");
+		return 0;
+	}
+	
+	dev = pdp_get_dev(nXanChannelID);
+	if(dev == NULL)
+	{
+		printk("XanCwSendToXanadu: pdp_get_dev returned NULL\n");
+		return 0;
+	}
+
+	if (dev->vs_dev.tty != NULL && dev->vs_dev.refcount) 
+	{
+		printk("XanCwSendToXanadu: pdp_get_dev %s %d\n",dev->vs_dev.tty_name,dev->vs_dev.tty->low_latency);
+		ret = tty_insert_flip_string(dev->vs_dev.tty, (u8 *)pi8_RecvdBuf, nRecvdBuflen);
+		if(ret < nRecvdBuflen)
+		{
+			printk("XanCwSendToXanadu: tty_insert_flip_string returned %d\n",ret);
+		}
+		tty_flip_buffer_push(dev->vs_dev.tty);
+	}
+	else
+	{
+		printk("XanCwSendToXanadu: pdp_get_dev %d \n",dev->vs_dev.refcount);
+		printk("XanCwSendToXanadu: pdp_get_dev %u \n",dev->vs_dev.tty);
+	}
+	printk("XanCwSendToXanadu: pdp_get_dev %d \n",dev->vs_dev.refcount);
+
+	return ret;
+}
+#endif
+
 static inline struct pdp_info *pdp_get_serdev(const char *name)
 {
 	int slot;
@@ -1584,9 +1739,12 @@ static int pdp_mux(struct pdp_info *dev, const void *data, size_t len)
 		wake_lock_timeout(&pdp_wake_lock, pdp_wake_time);
 #ifdef	NO_TTY_DPRAM
 		ret = multipdp_write(tx_buf, hdr->len + 2);
+		if (ret <= 0)
+			pr_err("[MULTIPDP] multipdp_write len=%d, ret=%d\n",
+				hdr->len + 2, ret);
 #endif
-		if (ret != hdr->len + 2) {
-			pr_debug("[MULTIPDP] dpram_write() failed: %d\n", ret);
+		if (ret < 0) {
+			pr_err("[MULTIPDP] dpram_write() failed: %d\n", ret);
 			return ret;
 		}
 		buf += nbytes;
@@ -1896,9 +2054,8 @@ static int pdp_adjust(const int adjust)
 static long multipdp_ioctl(struct file *file, unsigned int cmd,
 			   unsigned long arg)
 {
-	int ret, adjust, slot;
+	int ret, adjust;
 	struct pdp_arg pdp_arg;
-	struct pdp_info *dev;
 
 	switch (cmd) {
 	case HN_PDP_ACTIVATE:
@@ -1922,26 +2079,10 @@ static long multipdp_ioctl(struct file *file, unsigned int cmd,
 		return pdp_adjust(adjust);
 
 	case HN_PDP_TXSTART:
-		for (slot = 0; slot < MAX_PDP_CONTEXT; slot++) {
-			dev = pdp_table[slot];
-			if (dev != NULL && dev->type == DEV_TYPE_NET) {
-				netif_wake_queue(dev->vn_dev.net);
-				pr_info("[MULTIPDP] %s %s netif_wake\n",
-					__func__, dev->vn_dev.net->name);
-			}
-		}
 		pdp_tx_flag = 0;
 		return 0;
 
 	case HN_PDP_TXSTOP:
-		for (slot = 0; slot < MAX_PDP_CONTEXT; slot++) {
-			dev = pdp_table[slot];
-			if (dev != NULL && dev->type == DEV_TYPE_NET) {
-				netif_stop_queue(dev->vn_dev.net);
-				pr_info("[MULTIPDP] %s %s netif_stop\n",
-					__func__, dev->vn_dev.net->name);
-			}
-		}
 		pdp_tx_flag = 1;
 		return 0;
 
@@ -2022,7 +2163,7 @@ static struct work_struct dpram_open_work;
 static void dpram_open_work_func(struct work_struct *work)
 {
 	int ret;
-	struct pdp_arg pdp_args[7] = {
+	struct pdp_arg pdp_args[MAX_PDP_CONTEXT] = {
 		{.id = 1, .ifname = "ttyCSD"},
 		{.id = 8, .ifname = "ttyEFS"},
 		{.id = 5, .ifname = "ttyGPS"},
@@ -2030,6 +2171,11 @@ static void dpram_open_work_func(struct work_struct *work)
 		{.id = 25, .ifname = "ttySMD"},
 		{.id = 29, .ifname = "ttyCPLOG"},
 		{.id = 31, .ifname = "ttyLOOPBACK"},
+		{ .id = 7, .ifname = "ttyCDMA" },
+#ifdef CONFIG_SAMSUNG_CTC_CW		
+		{ .id = 36, .ifname = "ttyCWPPP" },
+		{ .id = 41, .ifname = "ttyCWXAN" },
+#endif
 	};
 
 	msleep(100);
@@ -2047,7 +2193,7 @@ static void dpram_open_work_func(struct work_struct *work)
 	}
 
 	/* create serial device for Circuit Switched Data */
-	for (ret = 0; ret < 7; ret++) {
+	for (ret = 0; ret < MAX_PDP_CONTEXT; ret++) {
 		if (pdp_activate(&pdp_args[ret],
 					DEV_TYPE_SERIAL,
 					DEV_FLAG_STICKY) < 0) {
