@@ -26,7 +26,6 @@
 #include <linux/irq.h>
 
 #include <linux/version.h>
-#include <linux/sched.h>
 
 #ifdef _ENABLE_ERROR_DEVICE
 #include <linux/poll.h>
@@ -43,10 +42,11 @@
 #include <mach/msm_iomap.h>
 #include <linux/proc_fs.h>
 #include <linux/wakelock.h>
+#include <linux/sched.h>
 
 #include "dpram.h"
 #include "../../arch/arm/mach-msm/smd_private.h"
-#include "../../arch/arm/mach-msm/include/mach/proc_comm.h"
+#include "../../arch/arm/mach-msm/include/mach/proc_comm.h" 
 
 #ifdef CONFIG_SEC_MISC
 #include <linux/sec_param.h>
@@ -85,11 +85,9 @@ struct delayed_work wq_param_init;
 
 samsung_vendor1_id *smem_vendor1;
 int silent_value;
-#if defined(CONFIG_MACH_TREBON) || defined(CONFIG_MACH_JENA)
+
 int default_dump_enable_flag;
-#else
-int default_dump_enable_flag = 1;
-#endif
+
 int dump_enable_flag;
 EXPORT_SYMBOL(dump_enable_flag);
 
@@ -134,6 +132,7 @@ static dpram_device_t dpram_table[MAX_INDEX] = {
 
 static struct tty_struct *dpram_tty[MAX_INDEX];
 static struct ktermios *dpram_termios[MAX_INDEX];
+static struct ktermios *dpram_termios_locked[MAX_INDEX];
 
 extern void *smem_alloc(unsigned, unsigned);
 extern void *smem_do_alloc(unsigned id, unsigned size_in);
@@ -381,13 +380,14 @@ int multipdp_write(const unsigned char *buf, int len)
 	for (i = 0; i < 10; i++) {
 		ret = dpram_write(device, buf, len);
 
-		if (ret == len)
+		if (ret > 0)
 			break;
+
+		dprintk("dpram_write() failed: %d, i(%d)\n", ret, i);
 	}
 
 	if (i >= 10)
-		pr_err("[DPRAM] %s DPRAM write RT10!!\n",
-			__func__);
+		dprintk("dpram_write() failed: %d\n", ret);
 
 	return ret;
 #endif
@@ -545,7 +545,7 @@ static int dpram_write(dpram_device_t *device,
 		const unsigned char *buf, int len)
 {
 	int retval = 0;
-	int size = 0, free_space = 0;
+	int size = 0;
 	u16 head, tail;
 	u16 irq_mask = 0;
 
@@ -553,18 +553,6 @@ static int dpram_write(dpram_device_t *device,
 
 	READ_FROM_DPRAM_VERIFY(&head, device->out_head_addr, sizeof(head));
 	READ_FROM_DPRAM_VERIFY(&tail, device->out_tail_addr, sizeof(tail));
-
-	free_space = (head < tail) ? tail - head - 1 :
-		device->out_buff_size - head + tail - 1;
-
-	if (free_space < len) {
-		irq_mask = INT_MASK_VALID;
-		irq_mask |= device->mask_req_ack;
-		send_interrupt_to_phone(irq_mask);
-
-		up(&write_mutex);
-		return -EINVAL;
-	}
 
 	if (head < tail) { /* +++++++++ head ---------- tail ++++++++++ */
 		size = tail - head - 1;
@@ -602,6 +590,9 @@ static int dpram_write(dpram_device_t *device,
 
 	if (retval > 0)
 		irq_mask |= device->mask_send;
+
+	if (len > retval)
+		irq_mask |= device->mask_req_ack;
 
 	send_interrupt_to_phone(irq_mask);
 
@@ -1319,6 +1310,35 @@ static void cmd_error_display_handler(void)
 #endif	/* _ENABLE_ERROR_DEVICE */
 }
 
+
+#ifdef CONFIG_SLOT_SWITCH
+//lee202Test
+void slot_switch_handler2(int slot_switch)
+{
+	char buf[DPRAM_ERR_MSG_LEN];
+	unsigned long flags;
+
+	memset((void*)buf, 0, sizeof(buf));
+
+	if(slot_switch == 8) {
+		memcpy((void*)buf, "$SIM-SLOT-0", sizeof("$SIM-SLOT-0"));
+	}
+	else if(slot_switch == 9) {
+		memcpy((void*)buf, "$SIM-SLOT-1", sizeof("$SIM-SLOT-1"));
+	}
+	else {
+		memcpy((void*)buf, "$Unknown SIM Info", sizeof("$Unknown SIM Info"));
+	}
+	printk("dpram err string : %s\n", buf);
+	local_irq_save(flags);
+	memcpy(dpram_err_buf, buf, DPRAM_ERR_MSG_LEN);
+	dpram_err_len = 64;
+	local_irq_restore(flags);
+	wake_up_interruptible(&dpram_err_wait_q);
+	kill_fasync(&dpram_err_async_q, SIGIO, POLL_IN);
+}
+EXPORT_SYMBOL(slot_switch_handler2);
+#endif
 static void cmd_phone_start_handler(void)
 {
 	dprintk("\n");
@@ -1432,7 +1452,7 @@ static void command_handler(u16 cmd)
 		cmd_chg_state_changed();
 		break;
 	case INT_MASK_CMD_CHG_FUEL_ALERT:
-		msm_battery_fuel_alert();
+		/*	TO-DO	*/
 		break;
 	default:
 		dprintk("Unknown command..\n");
@@ -1630,6 +1650,7 @@ static int register_dpram_driver(void)
 
 	dpram_tty_driver->ttys = dpram_tty;
 	dpram_tty_driver->termios = dpram_termios;
+//	dpram_tty_driver->termios_locked = dpram_termios_locked;
 
 	/* @LDK@ register tty driver */
 	retval = tty_register_driver(dpram_tty_driver);
@@ -1900,7 +1921,11 @@ static int __devinit dpram_probe(struct platform_device *dev)
 
 	/* @LDK@ check out missing interrupt from the phone */
 	//check_miss_interrupt();
+#ifdef CONFIG_SLOT_SWITCH
 
+//lee202Test
+	cdma_slot_switch_handler = slot_switch_handler2;
+#endif
 	return 0;
 }
 
@@ -2076,7 +2101,7 @@ static int __init dpram_init(void)
 	platform_device_register_simple("dpram", -1, NULL, 0);
 
 	/* For silent ram dump mode */
-	ent = create_proc_entry("silent", 0664, NULL);	
+	ent = create_proc_entry("silent", S_IRWXUGO, NULL);
 	ent->read_proc = silent_read_proc_debug;
 	ent->write_proc = silent_write_proc_debug;
 	smem_vendor1 = (samsung_vendor1_id *)smem_do_alloc(SMEM_ID_VENDOR1,
@@ -2084,7 +2109,7 @@ static int __init dpram_init(void)
 	if (smem_vendor1 && smem_vendor1->silent_reset == 0xAEAEAEAE)
 		silent_value = 1;
 
-	ent = create_proc_entry("dump_enable", 0664, NULL);	
+	ent = create_proc_entry("dump_enable", S_IRWXUGO, NULL);
 	ent->read_proc = dump_read_proc_debug;
 	ent->write_proc = dump_write_proc_debug;
 	if (smem_vendor1) {

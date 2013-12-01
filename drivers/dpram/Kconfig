@@ -7,12 +7,12 @@ menu "Dpram support"
 
 config DPRAM
        tristate "Using smem as dpram"
-       default y
+       default n
        ---help---
 		Include this for using smem as dpram for communication between modem and appl.
 config DPRAM_WHITELIST
        bool "Using dpram to send whitelist port infos"
-       default y
+       default n
        ---help---
 		Include this for using whitelist.
 
