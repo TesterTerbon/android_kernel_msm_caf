@@ -474,7 +474,7 @@ int init_nr_buf(struct vcap_client_data *c_data)
 	else
 		tot_size = frame_size / 2 * 3;
 
-	handle = ion_alloc(dev->ion_client, tot_size, SZ_4K,
+	handle = ion_alloc(dev->ion_client, SZ_4K,
 			ION_HEAP(ION_CP_MM_HEAP_ID), 0);
 	if (IS_ERR_OR_NULL(handle)) {
 		pr_err("%s: ion_alloc failed\n", __func__);
@@ -604,7 +604,7 @@ int vp_dummy_event(struct vcap_client_data *c_data)
 	int rc = 0;
 
 	dprintk(2, "%s: Start VP dummy event\n", __func__);
-	handle = ion_alloc(dev->ion_client, 0x1200, SZ_4K,
+	handle = ion_alloc(dev->ion_client, SZ_4K,
 			ION_HEAP(ION_CP_MM_HEAP_ID), 0);
 	if (IS_ERR_OR_NULL(handle)) {
 		pr_err("%s: ion_alloc failed\n", __func__);

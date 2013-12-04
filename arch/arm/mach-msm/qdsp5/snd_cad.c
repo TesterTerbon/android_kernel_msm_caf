@@ -208,10 +208,10 @@ static int get_endpoint(struct snd_cad_ctxt *snd, unsigned long arg)
 	int rc = 0, index;
 	struct msm_cad_endpoint ept;
 
-	if (copy_from_user(&ept, (void __user *)arg, sizeof(ept))) {
-		MM_ERR("cad_ioctl get endpoint: invalid read pointer\n");
-		return -EFAULT;
-	}
+        if (copy_from_user(&ept, (void __user *)arg, sizeof(ept))) {
+                MM_ERR("cad_ioctl get endpoint: invalid read pointer\n");
+                return -EFAULT;
+        }
 
 	index = ept.id;
 	if (index < 0 || index >= snd->cad_epts->num) {

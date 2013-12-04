@@ -253,6 +253,8 @@ static int adsp_ion_lookup_vaddr(struct msm_adsp_module *module, void **addr,
 	return *region ? 0 : -1;
 }
 
+#define CACHED          1
+
 int adsp_ion_do_cache_op(struct msm_adsp_module *module,
 				void *addr, void *paddr, unsigned long len,
 				unsigned long offset, int cmd)

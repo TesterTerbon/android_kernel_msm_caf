@@ -181,8 +181,7 @@ void ion_client_destroy(struct ion_client *client);
  * an opaque handle to it.
  */
 struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
-			     size_t align, unsigned int heap_mask,
-			     unsigned int flags);
+                             size_t align, unsigned int flags);
 
 /**
  * ion_free - free a handle
@@ -399,11 +398,9 @@ static inline struct ion_client *msm_ion_client_create(unsigned int heap_mask,
 static inline void ion_client_destroy(struct ion_client *client) { }
 
 static inline struct ion_handle *ion_alloc(struct ion_client *client,
-					size_t len, size_t align,
-					unsigned int heap_mask,
-					unsigned int flags)
+                        size_t len, size_t align, unsigned int flags)
 {
-	return ERR_PTR(-ENODEV);
+        return ERR_PTR(-ENODEV);
 }
 
 static inline void ion_free(struct ion_client *client,
