@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,7 +12,7 @@
 
 #include "msm_fb.h"
 #include "mipi_dsi.h"
-#include "mipi_NT35590.h"
+#include "mipi_hx8389b.h"
 
 static struct msm_panel_info pinfo;
 
@@ -29,28 +29,28 @@ static struct mipi_dsi_phy_ctrl dsi_cmd_mode_phy_db = {
 	{0xbb, 0x02, 0x06, 0x00},
 	/* pll control */
 	{0x01, 0xec, 0x31, 0xd2, 0x00, 0x40, 0x37, 0x62,
-	0x01, 0x0f, 0x03,
+	0x01, 0x0f, 0x07,
 	0x05, 0x14, 0x03, 0x0, 0x0, 0x0, 0x20, 0x0, 0x02, 0x0},
 };
 
-static int mipi_cmd_nt35590_720p_pt_init(void)
+static int mipi_cmd_hx8389b_qhd_pt_init(void)
 {
 	int ret;
 
-	if (msm_fb_detect_client("mipi_cmd_nt35590_720p"))
+	if (msm_fb_detect_client("mipi_cmd_hx8389b_qhd"))
 		return 0;
 
-	pinfo.xres = 720;
-	pinfo.yres = 1280;
+	pinfo.xres = 540;
+	pinfo.yres = 960;
 	pinfo.type = MIPI_CMD_PANEL;
 	pinfo.pdest = DISPLAY_1;
 	pinfo.wait_cycle = 0;
 	pinfo.bpp = 24;
-	pinfo.lcdc.h_back_porch = 164;
-	pinfo.lcdc.h_front_porch = 140;
-	pinfo.lcdc.h_pulse_width = 1;
-	pinfo.lcdc.v_back_porch = 1;
-	pinfo.lcdc.v_front_porch = 6;
+	pinfo.lcdc.h_back_porch = 100;
+	pinfo.lcdc.h_front_porch = 100;
+	pinfo.lcdc.h_pulse_width = 8;
+	pinfo.lcdc.v_back_porch = 20;
+	pinfo.lcdc.v_front_porch = 20;
 	pinfo.lcdc.v_pulse_width = 1;
 
 	pinfo.lcdc.border_clr = 0;	/* blk */
@@ -64,7 +64,7 @@ static int mipi_cmd_nt35590_720p_pt_init(void)
 
 	pinfo.lcd.vsync_enable = TRUE;
 	pinfo.lcd.hw_vsync_mode = TRUE;
-	pinfo.lcd.refx100 = 6000; /* adjust refx100 to prevent tearing */
+	pinfo.lcd.refx100 = 6200; /* adjust refx100 to prevent tearing */
 
 	pinfo.mipi.mode = DSI_CMD_MODE;
 	pinfo.mipi.dst_format = DSI_CMD_DST_FORMAT_RGB888;
@@ -72,14 +72,11 @@ static int mipi_cmd_nt35590_720p_pt_init(void)
 	pinfo.mipi.rgb_swap = DSI_RGB_SWAP_RGB;
 	pinfo.mipi.data_lane0 = TRUE;
 	pinfo.mipi.data_lane1 = TRUE;
-	pinfo.mipi.data_lane2 = TRUE;
-	pinfo.mipi.data_lane3 = TRUE;
 	pinfo.mipi.t_clk_post = 0x20;
 	pinfo.mipi.t_clk_pre = 0x2F;
 	pinfo.mipi.stream = 0; /* dma_p */
 	pinfo.mipi.mdp_trigger = DSI_CMD_TRIGGER_SW;
 	pinfo.mipi.dma_trigger = DSI_CMD_TRIGGER_SW;
-	pinfo.mipi.frame_rate = 58;
 	pinfo.mipi.te_sel = 1; /* TE from vsync gpio */
 	pinfo.mipi.interleave_max = 1;
 	pinfo.mipi.insert_dcs_cmd = TRUE;
@@ -89,12 +86,12 @@ static int mipi_cmd_nt35590_720p_pt_init(void)
 	pinfo.mipi.tx_eot_append = 0x01;
 	pinfo.mipi.rx_eot_ignore = 0x0;
 
-	ret = mipi_nt35590_device_register(&pinfo, MIPI_DSI_PRIM,
-						MIPI_DSI_PANEL_720P_PT);
+	ret = mipi_hx8389b_device_register(&pinfo, MIPI_DSI_PRIM,
+						MIPI_DSI_PANEL_WVGA_PT);
 	if (ret)
 		pr_err("%s: failed to register device!\n", __func__);
 
 	return ret;
 }
 
-module_init(mipi_cmd_nt35590_720p_pt_init);
+module_init(mipi_cmd_hx8389b_qhd_pt_init);

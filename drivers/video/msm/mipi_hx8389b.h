@@ -11,10 +11,10 @@
  *
  */
 
-#ifndef MIPI_NT35590_H
-#define MIPI_NT35590_H
+#ifndef MIPI_HX8389B_H
+#define MIPI_HX8389B_H
 
-int mipi_nt35590_device_register(struct msm_panel_info *pinfo,
+int mipi_hx8389b_device_register(struct msm_panel_info *pinfo,
 					u32 channel, u32 panel);
 
-#endif  /* MIPI_NT35590_H */
+#endif  /* MIPI_HX8389B_H */
