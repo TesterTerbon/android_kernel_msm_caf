@@ -25,6 +25,11 @@
 
 #include "clock.h"
 
+static struct dentry *debugfs_base;
+static u32 debug_suspend;
+static struct clk_lookup *msm_clocks;
+static size_t num_msm_clocks;
+
 static int clock_debug_rate_set(void *data, u64 val)
 {
 	struct clk *clock = data;
@@ -218,39 +223,6 @@ static const struct file_operations list_rates_fops = {
 	.release	= seq_release,
 };
 
-static int fmax_rates_show(struct seq_file *m, void *unused)
-{
-	struct clk *clock = m->private;
-	int level = 0;
-
-	int vdd_level = find_vdd_level(clock, clock->rate);
-	if (vdd_level < 0) {
-		seq_printf(m, "could not find_vdd_level for %s, %ld\n",
-			clock->dbg_name, clock->rate);
-		return 0;
-	}
-	for (level = 0; level < ARRAY_SIZE(clock->fmax); level++) {
-		if (vdd_level == level)
-			seq_printf(m, "[%lu] ", clock->fmax[level]);
-		else
-			seq_printf(m, "%lu ", clock->fmax[level]);
-	}
-	seq_printf(m, "\n");
-
-	return 0;
-}
-
-static int fmax_rates_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, fmax_rates_show, inode->i_private);
-}
-
-static const struct file_operations fmax_rates_fops = {
-	.open		= fmax_rates_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release,
-};
 
 int __init clock_debug_add(struct clk *clock)
 {
@@ -308,39 +280,6 @@ error:
 static LIST_HEAD(clk_list);
 static DEFINE_SPINLOCK(clk_list_lock);
 
-/**
- * clock_debug_register() - Add additional clocks to clock debugfs hierarchy
- * @table: Table of clocks to create debugfs nodes for
- * @size: Size of @table
- *
- * Use this function to register additional clocks in debugfs. The clock debugfs
- * hierarchy must have already been initialized with clock_debug_init() prior to
- * calling this function. Unlike clock_debug_init(), this may be called multiple
- * times with different clock lists and can be used after the kernel has
- * finished booting.
- */
-int clock_debug_register(struct clk_lookup *table, size_t size)
-{
-	struct clk_table *clk_table;
-	unsigned long flags;
-	int i;
-
-	clk_table = kmalloc(sizeof(*clk_table), GFP_KERNEL);
-	if (!clk_table)
-		return -ENOMEM;
-
-	clk_table->clocks = table;
-	clk_table->num_clocks = size;
-
-	spin_lock_irqsave(&clk_list_lock, flags);
-	list_add_tail(&clk_table->node, &clk_list);
-	spin_unlock_irqrestore(&clk_list_lock, flags);
-
-	for (i = 0; i < size; i++)
-		clock_debug_add(table[i].clk);
-
-	return 0;
-}
 
 /**
  * clock_debug_init() - Initialize clock debugfs
@@ -394,24 +333,18 @@ static int clock_debug_print_clock(struct clk *c)
  */
 void clock_debug_print_enabled(void)
 {
-	struct clk_table *table;
-	unsigned long flags;
-	int i, cnt = 0;
+        unsigned i;
+        int cnt = 0;
 
-	if (likely(!debug_suspend))
-		return;
+        if (likely(!debug_suspend))
+                return;
 
-	pr_info("Enabled clocks:\n");
-	spin_lock_irqsave(&clk_list_lock, flags);
-	list_for_each_entry(table, &clk_list, node) {
-		for (i = 0; i < table->num_clocks; i++)
-			cnt += clock_debug_print_clock(table->clocks[i].clk);
-	}
-	spin_unlock_irqrestore(&clk_list_lock, flags);
+        pr_info("Enabled clocks:\n");
+        for (i = 0; i < num_msm_clocks; i++)
+                cnt += clock_debug_print_clock(msm_clocks[i].clk);
 
-	if (cnt)
-		pr_info("Enabled clock count: %d\n", cnt);
-	else
-		pr_info("No clocks enabled.\n");
-
+        if (cnt)
+                pr_info("Enabled clock count: %d\n", cnt);
+        else
+                pr_info("No clocks enabled.\n");
 }

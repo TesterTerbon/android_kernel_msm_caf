@@ -420,56 +420,25 @@ int config_vp_format(struct vcap_client_data *c_data)
 
 int init_motion_buf(struct vcap_client_data *c_data)
 {
-	int rc;
-	struct vcap_dev *dev = c_data->dev;
-	struct ion_handle *handle = NULL;
-	unsigned long paddr, ionflag = 0;
-	void *vaddr;
-	size_t len;
-	size_t size = ((c_data->vp_out_fmt.width + 63) >> 6) *
-		((c_data->vp_out_fmt.height + 7) >> 3) * 16;
+        struct vcap_dev *dev = c_data->dev;
+        void *buf;
+        unsigned long motion_base_addr;
+        uint32_t size = ((c_data->vp_out_fmt.width + 63) >> 6) *
+                ((c_data->vp_out_fmt.height + 7) >> 3) * 16;
 
-	if (c_data->vid_vp_action.motionHandle) {
-		pr_err("Motion buffer has already been created");
-		return -ENOEXEC;
-	}
+        if (c_data->vid_vp_action.bufMotion) {
+                pr_err("Motion buffer has already been created");
+                return -ENOEXEC;
+        }
 
-	handle = ion_alloc(dev->ion_client, size, SZ_4K,
-			ION_HEAP(ION_CP_MM_HEAP_ID), 0);
-	if (IS_ERR_OR_NULL(handle)) {
-		pr_err("%s: ion_alloc failed\n", __func__);
-		return -ENOMEM;
-	}
-	rc = ion_phys(dev->ion_client, handle, &paddr, &len);
-	if (rc < 0) {
-		pr_err("%s: ion_phys failed\n", __func__);
-		ion_free(dev->ion_client, handle);
-		return rc;
-	}
+        buf = kzalloc(size, GFP_KERNEL);
+        if (!buf)
+                return -ENOMEM;
 
-	rc = ion_handle_get_flags(dev->ion_client, handle, &ionflag);
-	if (rc) {
-		pr_err("%s: get flags ion handle failed\n", __func__);
-		ion_free(dev->ion_client, handle);
-		return rc;
-	}
-
-	vaddr = ion_map_kernel(dev->ion_client, handle);
-	if (IS_ERR(vaddr)) {
-		pr_err("%s: Map motion buffer failed\n", __func__);
-		ion_free(dev->ion_client, handle);
-		rc = -ENOMEM;
-		return rc;
-	}
-
-	memset(vaddr, 0, size);
-	c_data->vid_vp_action.motionHandle = handle;
-
-	vaddr = NULL;
-	ion_unmap_kernel(dev->ion_client, handle);
-
-	writel_iowmb(paddr, VCAP_VP_MOTION_EST_ADDR);
-	return 0;
+        c_data->vid_vp_action.bufMotion = buf;
+        motion_base_addr = virt_to_phys(buf);
+        writel_iowmb(motion_base_addr, VCAP_VP_MOTION_EST_ADDR);
+        return 0;
 }
 
 void deinit_motion_buf(struct vcap_client_data *c_data)

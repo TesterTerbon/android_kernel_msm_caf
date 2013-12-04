@@ -129,8 +129,8 @@ struct clk {
 	.children = LIST_HEAD_INIT((name).children), \
 	.siblings = LIST_HEAD_INIT((name).siblings)
 
-int vote_vdd_level(struct clk_vdd_class *vdd_class, int level);
-int unvote_vdd_level(struct clk_vdd_class *vdd_class, int level);
+//int vote_vdd_level(struct clk_vdd_class *vdd_class, int level);
+//int unvote_vdd_level(struct clk_vdd_class *vdd_class, int level);
 
 /* Register clocks with the MSM clock driver */
 int msm_clock_register(struct clk_lookup *table, size_t size);
