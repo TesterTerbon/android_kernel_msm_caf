@@ -16,6 +16,7 @@
 #include <linux/cpu.h>
 #include <linux/syscalls.h>
 #include <linux/gfp.h>
+#include <linux/rtc.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
