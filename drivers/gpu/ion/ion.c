@@ -107,6 +107,24 @@ struct ion_handle {
 
 static void ion_iommu_release(struct kref *kref);
 
+static int ion_validate_buffer_flags(struct ion_buffer *buffer,
+                                        unsigned long flags)
+{
+        if (buffer->kmap_cnt || buffer->dmap_cnt || buffer->umap_cnt ||
+                buffer->iommu_map_cnt) {
+                if (buffer->flags != flags) {
+                        pr_err("%s: buffer was already mapped with flags %lx,"
+                                " cannot map with flags %lx\n", __func__,
+                                buffer->flags, flags);
+                        return 1;
+                }
+
+        } else {
+                buffer->flags = flags;
+        }
+        return 0;
+}
+
 /* this function should only be called while dev->lock is held */
 static void ion_buffer_add(struct ion_device *dev,
 			   struct ion_buffer *buffer)
@@ -395,92 +413,90 @@ static void ion_handle_add(struct ion_client *client, struct ion_handle *handle)
 }
 
 struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
-			     size_t align, unsigned int heap_mask,
-			     unsigned int flags)
+                             size_t align, unsigned int flags)
 {
-	struct rb_node *n;
-	struct ion_handle *handle;
-	struct ion_device *dev = client->dev;
-	struct ion_buffer *buffer = NULL;
-	unsigned long secure_allocation = flags & ION_SECURE;
-	const unsigned int MAX_DBG_STR_LEN = 64;
-	char dbg_str[MAX_DBG_STR_LEN];
-	unsigned int dbg_str_idx = 0;
+        struct rb_node *n;
+        struct ion_handle *handle;
+        struct ion_device *dev = client->dev;
+        struct ion_buffer *buffer = NULL;
+        unsigned long secure_allocation = flags & ION_SECURE;
+        const unsigned int MAX_DBG_STR_LEN = 64;
+        char dbg_str[MAX_DBG_STR_LEN];
+        unsigned int dbg_str_idx = 0;
 
-	dbg_str[0] = '\0';
+        dbg_str[0] = '\0';
 
-	/*
-	 * traverse the list of heaps available in this system in priority
-	 * order.  If the heap type is supported by the client, and matches the
-	 * request of the caller allocate from it.  Repeat until allocate has
-	 * succeeded or all heaps have been tried
-	 */
-	if (WARN_ON(!len))
-		return ERR_PTR(-EINVAL);
+        /*
+         * traverse the list of heaps available in this system in priority
+         * order.  If the heap type is supported by the client, and matches the
+         * request of the caller allocate from it.  Repeat until allocate has
+         * succeeded or all heaps have been tried
+         */
+        if (WARN_ON(!len))
+                return ERR_PTR(-EINVAL);
 
-	len = PAGE_ALIGN(len);
+        len = PAGE_ALIGN(len);
 
-	mutex_lock(&dev->lock);
-	for (n = rb_first(&dev->heaps); n != NULL; n = rb_next(n)) {
-		struct ion_heap *heap = rb_entry(n, struct ion_heap, node);
-		/* if the client doesn't support this heap type */
-		if (!((1 << heap->type) & client->heap_mask))
-			continue;
-		/* if the caller didn't specify this heap type */
-		if (!((1 << heap->id) & heap_mask))
-			continue;
-		/* Do not allow un-secure heap if secure is specified */
-		if (secure_allocation &&
-			(heap->type != (enum ion_heap_type) ION_HEAP_TYPE_CP))
-			continue;
-		buffer = ion_buffer_create(heap, dev, len, align, flags);
-		if (!IS_ERR_OR_NULL(buffer))
-			break;
-		if (dbg_str_idx < MAX_DBG_STR_LEN) {
-			unsigned int len_left = MAX_DBG_STR_LEN-dbg_str_idx-1;
-			int ret_value = snprintf(&dbg_str[dbg_str_idx],
-						len_left, "%s ", heap->name);
-			if (ret_value >= len_left) {
-				/* overflow */
-				dbg_str[MAX_DBG_STR_LEN-1] = '\0';
-				dbg_str_idx = MAX_DBG_STR_LEN;
-			} else if (ret_value >= 0) {
-				dbg_str_idx += ret_value;
-			} else {
-				/* error */
-				dbg_str[MAX_DBG_STR_LEN-1] = '\0';
-			}
-		}
-	}
-	mutex_unlock(&dev->lock);
+        mutex_lock(&dev->lock);
+        for (n = rb_first(&dev->heaps); n != NULL; n = rb_next(n)) {
+                struct ion_heap *heap = rb_entry(n, struct ion_heap, node);
+                /* if the client doesn't support this heap type */
+                if (!((1 << heap->type) & client->heap_mask))
+                        continue;
+                /* if the caller didn't specify this heap type */
+                if (!((1 << heap->id) & flags))
+                        continue;
+                /* Do not allow un-secure heap if secure is specified */
+                if (secure_allocation && (heap->type != ION_HEAP_TYPE_CP))
+                        continue;
+                buffer = ion_buffer_create(heap, dev, len, align, flags);
+                if (!IS_ERR_OR_NULL(buffer))
+                        break;
+                if (dbg_str_idx < MAX_DBG_STR_LEN) {
+                        unsigned int len_left = MAX_DBG_STR_LEN-dbg_str_idx-1;
+                        int ret_value = snprintf(&dbg_str[dbg_str_idx],
+                                                len_left, "%s ", heap->name);
+                        if (ret_value >= len_left) {
+                                /* overflow */
+                                dbg_str[MAX_DBG_STR_LEN-1] = '\0';
+                                dbg_str_idx = MAX_DBG_STR_LEN;
+                        } else if (ret_value >= 0) {
+                                dbg_str_idx += ret_value;
+                        } else {
+                                /* error */
+                                dbg_str[MAX_DBG_STR_LEN-1] = '\0';
+                        }
+                }
+        }
+        mutex_unlock(&dev->lock);
 
-	if (buffer == NULL)
-		return ERR_PTR(-ENODEV);
+        if (buffer == NULL)
+                return ERR_PTR(-ENODEV);
 
-	if (IS_ERR(buffer)) {
-		pr_debug("ION is unable to allocate 0x%x bytes (alignment: "
-			 "0x%x) from heap(s) %sfor client %s with heap "
-			 "mask 0x%x\n",
-			len, align, dbg_str, client->name, client->heap_mask);
-		return ERR_PTR(PTR_ERR(buffer));
-	}
+        if (IS_ERR(buffer)) {
+                pr_debug("ION is unable to allocate 0x%x bytes (alignment: "
+                         "0x%x) from heap(s) %sfor client %s with heap "
+                         "mask 0x%x\n",
+                        len, align, dbg_str, client->name, client->heap_mask);
+                return ERR_PTR(PTR_ERR(buffer));
+        }
 
-	handle = ion_handle_create(client, buffer);
+        handle = ion_handle_create(client, buffer);
 
-	/*
-	 * ion_buffer_create will create a buffer with a ref_cnt of 1,
-	 * and ion_handle_create will take a second reference, drop one here
-	 */
-	ion_buffer_put(buffer);
+        /*
+         * ion_buffer_create will create a buffer with a ref_cnt of 1,
+         * and ion_handle_create will take a second reference, drop one here
+         */
+        ion_buffer_put(buffer);
 
-	if (!IS_ERR(handle)) {
-		mutex_lock(&client->lock);
-		ion_handle_add(client, handle);
-		mutex_unlock(&client->lock);
-	}
+        if (!IS_ERR(handle)) {
+                mutex_lock(&client->lock);
+                ion_handle_add(client, handle);
+                mutex_unlock(&client->lock);
+        }
 
 
-	return handle;
+        return handle;
 }
 EXPORT_SYMBOL(ion_alloc);
 
@@ -756,33 +772,39 @@ out:
 }
 EXPORT_SYMBOL(ion_unmap_iommu);
 
-void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle)
+void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle,
+                        unsigned long flags)
 {
-	struct ion_buffer *buffer;
-	void *vaddr;
+        struct ion_buffer *buffer;
+        void *vaddr;
 
-	mutex_lock(&client->lock);
-	if (!ion_handle_validate(client, handle)) {
-		pr_err("%s: invalid handle passed to map_kernel.\n",
-		       __func__);
-		mutex_unlock(&client->lock);
-		return ERR_PTR(-EINVAL);
-	}
+        mutex_lock(&client->lock);
+        if (!ion_handle_validate(client, handle)) {
+                pr_err("%s: invalid handle passed to map_kernel.\n",
+                       __func__);
+                mutex_unlock(&client->lock);
+                return ERR_PTR(-EINVAL);
+        }
 
-	buffer = handle->buffer;
+        buffer = handle->buffer;
 
-	if (!handle->buffer->heap->ops->map_kernel) {
-		pr_err("%s: map_kernel is not implemented by this heap.\n",
-		       __func__);
-		mutex_unlock(&client->lock);
-		return ERR_PTR(-ENODEV);
-	}
+        if (!handle->buffer->heap->ops->map_kernel) {
+                pr_err("%s: map_kernel is not implemented by this heap.\n",
+                       __func__);
+                mutex_unlock(&client->lock);
+                return ERR_PTR(-ENODEV);
+        }
 
-	mutex_lock(&buffer->lock);
-	vaddr = ion_handle_kmap_get(handle);
-	mutex_unlock(&buffer->lock);
-	mutex_unlock(&client->lock);
-	return vaddr;
+        if (ion_validate_buffer_flags(buffer, flags)) {
+                mutex_unlock(&client->lock);
+                return ERR_PTR(-EEXIST);
+        }
+
+        mutex_lock(&buffer->lock);
+        vaddr = ion_handle_kmap_get(handle);
+        mutex_unlock(&buffer->lock);
+        mutex_unlock(&client->lock);
+        return vaddr;
 }
 EXPORT_SYMBOL(ion_map_kernel);
 
@@ -1310,9 +1332,8 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
 			return -EFAULT;
-		data.handle = ion_alloc(client, data.len, data.align,
-					     data.heap_mask, data.flags);
-
+                data.handle = ion_alloc(client, data.len, data.align,
+                                             data.flags);
 		if (IS_ERR(data.handle))
 			return PTR_ERR(data.handle);
 
