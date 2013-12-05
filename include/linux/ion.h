@@ -181,7 +181,8 @@ void ion_client_destroy(struct ion_client *client);
  * an opaque handle to it.
  */
 struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
-                             size_t align, unsigned int flags);
+			     size_t align, unsigned int heap_mask,
+			     unsigned int flags);
 
 /**
  * ion_free - free a handle
@@ -232,8 +233,7 @@ struct sg_table *ion_sg_table(struct ion_client *client,
  * can be used to access this address. If no flags are specified, this
  * will return a non-secure uncached mapping.
  */
-void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle,
-                        unsigned long flags);
+void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle);
 
 /**
  * ion_unmap_kernel() - destroy a kernel mapping for a handle
@@ -399,9 +399,11 @@ static inline struct ion_client *msm_ion_client_create(unsigned int heap_mask,
 static inline void ion_client_destroy(struct ion_client *client) { }
 
 static inline struct ion_handle *ion_alloc(struct ion_client *client,
-                        size_t len, size_t align, unsigned int flags)
+					size_t len, size_t align,
+					unsigned int heap_mask,
+					unsigned int flags)
 {
-        return ERR_PTR(-ENODEV);
+	return ERR_PTR(-ENODEV);
 }
 
 static inline void ion_free(struct ion_client *client,
@@ -421,9 +423,9 @@ static inline struct sg_table *ion_sg_table(struct ion_client *client,
 }
 
 static inline void *ion_map_kernel(struct ion_client *client,
-        struct ion_handle *handle, unsigned long flags)
+	struct ion_handle *handle, unsigned long flags)
 {
-        return ERR_PTR(-ENODEV);
+	return ERR_PTR(-ENODEV);
 }
 
 static inline void ion_unmap_kernel(struct ion_client *client,
