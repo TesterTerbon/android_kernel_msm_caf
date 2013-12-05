@@ -37,7 +37,7 @@
 #include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/earlysuspend.h>
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/msm_audio.h>
@@ -293,10 +293,9 @@ static int audio_enable(struct audio *audio)
 	cfg.snd_method = RPC_SND_METHOD_MIDI;
 
 	rc = audmgr_enable(&audio->audmgr, &cfg);
-	if (rc < 0) {
-		msm_adsp_dump(audio->audplay);
+	if (rc < 0)
 		return rc;
-	}
+
 	if (msm_adsp_enable(audio->audplay)) {
 		MM_ERR("msm_adsp_enable(audplay) failed\n");
 		audmgr_disable(&audio->audmgr);
@@ -336,9 +335,7 @@ static int audio_disable(struct audio *audio)
 		wake_up(&audio->write_wait);
 		msm_adsp_disable(audio->audplay);
 		audpp_disable(audio->dec_id, audio);
-		rc = audmgr_disable(&audio->audmgr);
-		if (rc < 0)
-			msm_adsp_dump(audio->audplay);
+		audmgr_disable(&audio->audmgr);
 		audio->out_needed = 0;
 		rmt_put_resource(audio);
 		audio->rmt_resource_released = 1;
@@ -744,7 +741,7 @@ static int audlpa_ion_add(struct audio *audio,
 		pr_err("%s: could not get flags for the handle\n", __func__);
 		goto flag_error;
 	}
-	kvaddr = (unsigned long)ion_map_kernel(audio->client, handle, ionflag);
+	kvaddr = (unsigned long)ion_map_kernel(audio->client, handle);
 	if (IS_ERR_OR_NULL((void *)kvaddr)) {
 		pr_err("%s: could not get virtual address\n", __func__);
 		goto map_error;

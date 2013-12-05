@@ -261,10 +261,8 @@ static int audio_enable(struct audio *audio)
 		cfg.snd_method = RPC_SND_METHOD_MIDI;
 
 		rc = audmgr_enable(&audio->audmgr, &cfg);
-		if (rc < 0) {
-			msm_adsp_dump(audio->audplay);
+		if (rc < 0)
 			return rc;
-		}
 	}
 
 	if (msm_adsp_enable(audio->audplay)) {
@@ -308,12 +306,8 @@ static int audio_disable(struct audio *audio)
 		wake_up(&audio->read_wait);
 		msm_adsp_disable(audio->audplay);
 		audpp_disable(audio->dec_id, audio);
-		if (audio->pcm_feedback == TUNNEL_MODE_PLAYBACK) {
-			rc = audmgr_disable(&audio->audmgr);
-			if (rc < 0)
-				msm_adsp_dump(audio->audplay);
-		}
-
+		if (audio->pcm_feedback == TUNNEL_MODE_PLAYBACK)
+			audmgr_disable(&audio->audmgr);
 		audio->out_needed = 0;
 		rmt_put_resource(audio);
 		audio->rmt_resource_released = 1;
@@ -1722,7 +1716,7 @@ static int audio_open(struct inode *inode, struct file *file)
 
 	MM_DBG("allocating mem sz = %d\n", mem_sz);
 	handle = ion_alloc(client, mem_sz, SZ_4K,
-		ION_HEAP(ION_AUDIO_HEAP_ID));
+		ION_HEAP(ION_AUDIO_HEAP_ID), 0);
 	if (IS_ERR_OR_NULL(handle)) {
 		MM_ERR("Unable to create allocate O/P buffers\n");
 		rc = -ENOMEM;
@@ -1748,7 +1742,7 @@ static int audio_open(struct inode *inode, struct file *file)
 		goto output_buff_get_flags_error;
 	}
 
-	audio->map_v_write = ion_map_kernel(client, handle, ionflag);
+	audio->map_v_write = ion_map_kernel(client, handle);
 	if (IS_ERR(audio->map_v_write)) {
 		MM_ERR("could not map write buffers,freeing instance 0x%08x\n",
 				(int)audio);
@@ -1764,7 +1758,7 @@ static int audio_open(struct inode *inode, struct file *file)
 	mem_sz = (PCM_BUFSZ_MIN * PCM_BUF_MAX_COUNT);
 	MM_DBG("allocating mem sz = %d\n", mem_sz);
 	handle = ion_alloc(client, mem_sz,
-			SZ_4K, ION_HEAP(ION_AUDIO_HEAP_ID));
+			SZ_4K, ION_HEAP(ION_AUDIO_HEAP_ID), 0);
 	if (IS_ERR_OR_NULL(handle)) {
 		MM_ERR("Unable to create allocate I/P buffers\n");
 		rc = -ENOMEM;
@@ -1791,8 +1785,7 @@ static int audio_open(struct inode *inode, struct file *file)
 		goto input_buff_get_flags_error;
 	}
 
-	audio->map_v_read = ion_map_kernel(client,
-		handle, ionflag);
+	audio->map_v_read = ion_map_kernel(client, handle);
 	if (IS_ERR(audio->map_v_read)) {
 		MM_ERR("could not map read buffers, freeing instance \
 				0x%08x\n", (int)audio);

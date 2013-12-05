@@ -208,10 +208,10 @@ static int get_endpoint(struct snd_cad_ctxt *snd, unsigned long arg)
 	int rc = 0, index;
 	struct msm_cad_endpoint ept;
 
-        if (copy_from_user(&ept, (void __user *)arg, sizeof(ept))) {
-                MM_ERR("cad_ioctl get endpoint: invalid read pointer\n");
-                return -EFAULT;
-        }
+	if (copy_from_user(&ept, (void __user *)arg, sizeof(ept))) {
+		MM_ERR("cad_ioctl get endpoint: invalid read pointer\n");
+		return -EFAULT;
+	}
 
 	index = ept.id;
 	if (index < 0 || index >= snd->cad_epts->num) {
@@ -285,9 +285,8 @@ static long snd_cad_ioctl(struct file *file, unsigned int cmd,
 		vmsg.args.device.rx_device = cpu_to_be32(dev.device.rx_device);
 		vmsg.args.device.tx_device = cpu_to_be32(dev.device.tx_device);
 		vmsg.args.method = cpu_to_be32(vol.method);
-		if (vol.method != SND_METHOD_VOICE &&
-				vol.method != SND_METHOD_MIDI) {
-			MM_ERR("set volume: invalid method %d\n", vol.method);
+		if (vol.method != SND_METHOD_VOICE) {
+			MM_ERR("set volume: invalid method\n");
 			rc = -EINVAL;
 			break;
 		}
@@ -438,7 +437,7 @@ static long snd_cad_vol_enable(const char *arg)
 	vmsg.args.device.rx_device = cpu_to_be32(vol.device.rx_device);
 	vmsg.args.device.tx_device = cpu_to_be32(vol.device.tx_device);
 	vmsg.args.method = cpu_to_be32(vol.method);
-	if (vol.method != SND_METHOD_VOICE && vol.method != SND_METHOD_MIDI) {
+	if (vol.method != SND_METHOD_VOICE) {
 		MM_ERR("snd_cad_ioctl set volume: invalid method\n");
 		rc = -EINVAL;
 		return rc;
@@ -449,7 +448,7 @@ static long snd_cad_vol_enable(const char *arg)
 	vmsg.args.client_data = 0;
 
 	MM_DBG("snd_cad_set_volume %d %d %d %d\n", vol.device.rx_device,
-			vol.device.tx_device, vol.method, vol.volume);
+			vol.device.rx_device, vol.method, vol.volume);
 
 	rc = msm_rpc_call(snd_cad_sys->ept,
 		SND_CAD_SET_VOLUME_PROC,
