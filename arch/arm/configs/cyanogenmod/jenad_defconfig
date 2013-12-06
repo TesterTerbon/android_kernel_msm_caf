@@ -1640,7 +1640,6 @@ CONFIG_I2C_ALGOBIT=y
 # I2C system bus drivers (mostly embedded / system-on-chip)
 #
 # CONFIG_I2C_DESIGNWARE_PLATFORM is not set
-CONFIG_I2C_GPIO=y
 # CONFIG_I2C_MSM is not set
 CONFIG_I2C_QUP=y
 # CONFIG_I2C_OCORES is not set
