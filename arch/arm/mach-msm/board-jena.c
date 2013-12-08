@@ -69,6 +69,10 @@
 #define CONFIG_MSM_CAMERA
 #endif
 
+#ifndef CONFIG_MSM_USE_PMEM_FOR_CAMERA
+#define CONFIG_MSM_USE_PMEM_FOR_CAMERA
+#endif
+
 #define _CONFIG_MACH_JENA // Temporary flag
 #define _CONFIG_MACH_TREBON // Temporary flag
 #define ADSP_RPC_PROG           0x3000000a
@@ -3705,7 +3709,9 @@ static void fix_sizes(void)
 	}
 
 #ifdef CONFIG_ION_MSM
+#ifndef CONFIG_MSM_USE_PMEM_FOR_CAMERA
 	msm_ion_camera_size = pmem_adsp_size;
+#endif
 	msm_ion_audio_size = (MSM_PMEM_AUDIO_SIZE + PMEM_KERNEL_EBI1_SIZE);
 	msm_ion_sf_size = pmem_mdp_size;
 #endif
@@ -3753,6 +3759,7 @@ static struct ion_platform_data ion_pdata = {
 			.name	= ION_VMALLOC_HEAP_NAME,
 		},
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+#ifndef CONFIG_MSM_USE_PMEM_FOR_CAMERA
 		/* PMEM_ADSP = CAMERA */
 		{
 			.id	= ION_CAMERA_HEAP_ID,
@@ -3761,6 +3768,7 @@ static struct ion_platform_data ion_pdata = {
 			.memory_type = ION_EBI_TYPE,
 			.extra_data = (void *)&co_ion_pdata,
 		},
+#endif
 		/* PMEM_AUDIO */
 		{
 			.id	= ION_AUDIO_HEAP_ID,
@@ -3806,6 +3814,12 @@ static struct android_pmem_platform_data *pmem_pdata_array[] __initdata = {
 		&android_pmem_audio_pdata,
 		&android_pmem_pdata,
 };
+#else
+#ifdef CONFIG_MSM_USE_PMEM_FOR_CAMERA
+static struct android_pmem_platform_data *pmem_pdata_array[] __initdata = {
+		&android_pmem_adsp_pdata,
+};
+#endif /* CONFIG_MSM_USE_PMEM_FOR_CAMERA */
 #endif
 #endif
 
@@ -3816,17 +3830,24 @@ static void __init size_pmem_devices(void)
 	android_pmem_adsp_pdata.size = pmem_adsp_size;
 	android_pmem_pdata.size = pmem_mdp_size;
 	android_pmem_audio_pdata.size = pmem_audio_size;
-
+#else
+#ifdef CONFIG_MSM_USE_PMEM_FOR_CAMERA
+	android_pmem_adsp_pdata.size = pmem_adsp_size;
+#endif /* CONFIG_MSM_USE_PMEM_FOR_CAMERA */
 #endif
 #endif
 }
 
 #ifdef CONFIG_ANDROID_PMEM
 #ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
+	/* stub */
+#else
+#ifdef CONFIG_MSM_USE_PMEM_FOR_CAMERA
 static void __init reserve_memory_for(struct android_pmem_platform_data *p)
 {
 	msm7x27a_reserve_table[p->memory_type].size += p->size;
 }
+#endif /* CONFIG_MSM_USE_PMEM_FOR_CAMERA */
 #endif
 #endif
 
@@ -3834,11 +3855,15 @@ static void __init reserve_pmem_memory(void)
 {
 #ifdef CONFIG_ANDROID_PMEM
 #ifndef CONFIG_MSM_MULTIMEDIA_USE_ION
+	/* stub */
+#else
+#ifdef CONFIG_MSM_USE_PMEM_FOR_CAMERA
 	unsigned int i;
 	for (i = 0; i < ARRAY_SIZE(pmem_pdata_array); ++i)
 		reserve_memory_for(pmem_pdata_array[i]);
 
 	msm7x27a_reserve_table[MEMTYPE_EBI1].size += pmem_kernel_ebi1_size;
+#endif /* CONFIG_MSM_USE_PMEM_FOR_CAMERA */
 #endif
 #endif
 }
@@ -3846,7 +3871,9 @@ static void __init reserve_pmem_memory(void)
 static void __init size_ion_devices(void)
 {
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+#ifndef CONFIG_MSM_USE_PMEM_FOR_CAMERA
 	ion_pdata.heaps[1].size = msm_ion_camera_size;
+#endif
 	ion_pdata.heaps[2].size = msm_ion_audio_size;
 	ion_pdata.heaps[3].size = msm_ion_sf_size;
 #endif
@@ -3855,7 +3882,9 @@ static void __init size_ion_devices(void)
 static void __init reserve_ion_memory(void)
 {
 #if defined(CONFIG_ION_MSM) && defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
+#ifndef CONFIG_MSM_USE_PMEM_FOR_CAMERA
 	msm7x27a_reserve_table[MEMTYPE_EBI1].size += msm_ion_camera_size;
+#endif
 	msm7x27a_reserve_table[MEMTYPE_EBI1].size += msm_ion_audio_size;
 	msm7x27a_reserve_table[MEMTYPE_EBI1].size += msm_ion_sf_size;
 #endif
