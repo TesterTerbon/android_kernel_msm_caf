@@ -33,6 +33,7 @@
 #include "msm_camera_eeprom.h"
 #include "msm_sensor_common.h"
 
+
 void msm_sensor_start_stream(struct msm_sensor_ctrl_t *s_ctrl);
 void msm_sensor_stop_stream(struct msm_sensor_ctrl_t *s_ctrl);
 void msm_sensor_group_hold_on(struct msm_sensor_ctrl_t *s_ctrl);
@@ -102,6 +103,18 @@ long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 
 int32_t msm_sensor_get_csi_params(struct msm_sensor_ctrl_t *s_ctrl,
 		struct csi_lane_params_t *sensor_output_info);
+
+int32_t msm_sensor_set_preview_size
+        (struct msm_sensor_ctrl_t *s_ctrl, int index);
+
+int32_t msm_sensor_set_picture_size
+        (struct msm_sensor_ctrl_t *s_ctrl, int index);
+
+int32_t msm_sensor_enable_i2c_mux
+        (struct msm_camera_i2c_conf *i2c_conf);
+
+int32_t msm_sensor_disable_i2c_mux
+        (struct msm_camera_i2c_conf *i2c_conf);
 
 struct msm_sensor_ctrl_t *get_sctrl(struct v4l2_subdev *sd);
 int32_t msm_sensor_free_sensor_data(struct msm_sensor_ctrl_t *s_ctrl);
