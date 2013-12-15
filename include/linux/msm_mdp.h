@@ -512,11 +512,6 @@ struct mdp_bl_scale_data {
 	uint32_t scale;
 };
 
-struct mdp_bl_scale_data {
-	uint32_t min_lvl;
-	uint32_t scale;
-};
-
 struct mdp_calib_config_data {
 	uint32_t ops;
 	uint32_t addr;

@@ -341,7 +341,6 @@ static void report_hs_key(uint32_t key_code, uint32_t key_parm)
 	}
 	switch (key) {
 	case KEY_POWER:
-	case KEY_END:
 		input_report_key(hs->ipdev, key, (key_code != HS_REL_K));
 #ifdef HS_DEBUG
 		pr_info("%s KEY_POWER %d\n", __func__, (key_code != HS_REL_K));

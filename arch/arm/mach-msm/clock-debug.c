@@ -218,41 +218,16 @@ static const struct file_operations list_rates_fops = {
 	.release	= seq_release,
 };
 
-static int fmax_rates_show(struct seq_file *m, void *unused)
-{
-	struct clk *clock = m->private;
-	int level = 0;
+static struct dentry *debugfs_base;
+static u32 debug_suspend;
 
-	int vdd_level = find_vdd_level(clock, clock->rate);
-	if (vdd_level < 0) {
-		seq_printf(m, "could not find_vdd_level for %s, %ld\n",
-			clock->dbg_name, clock->rate);
-		return 0;
-	}
-	for (level = 0; level < ARRAY_SIZE(clock->fmax); level++) {
-		if (vdd_level == level)
-			seq_printf(m, "[%lu] ", clock->fmax[level]);
-		else
-			seq_printf(m, "%lu ", clock->fmax[level]);
-	}
-	seq_printf(m, "\n");
-
-	return 0;
-}
-
-static int fmax_rates_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, fmax_rates_show, inode->i_private);
-}
-
-static const struct file_operations fmax_rates_fops = {
-	.open		= fmax_rates_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release,
+struct clk_table {
+	struct list_head node;
+	struct clk_lookup *clocks;
+	size_t num_clocks;
 };
 
-int __init clock_debug_add(struct clk *clock)
+static int clock_debug_add(struct clk *clock)
 {
 	char temp[50], *ptr;
 	struct dentry *clk_dir;
@@ -298,7 +273,6 @@ int __init clock_debug_add(struct clk *clock)
 	if (clock->vdd_class && !debugfs_create_file("fmax_rates",
 				S_IRUGO, clk_dir, clock, &fmax_rates_fops))
 			goto error;
-
 
 	return 0;
 error:

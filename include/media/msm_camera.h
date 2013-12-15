@@ -1017,7 +1017,6 @@ struct msm_snapshot_pp_status {
 #define CFG_MAX                       58
 #define CFG_SET_PREVIEW_SIZE          47
 #define CFG_SET_PICTURE_SIZE          48
-#define CFG_MAX			49
 
 #define MOVE_NEAR	0
 #define MOVE_FAR	1
