@@ -69,7 +69,9 @@ static int mipi_dsi_fps_level_change(struct platform_device *pdev,
 					u32 fps_level)
 {
 	mipi_dsi_wait4video_done();
+#ifndef CONFIG_ARCH_MSM7X27A
 	mipi_dsi_configure_fb_divider(fps_level);
+#endif
 	return 0;
 }
 

@@ -1780,7 +1780,9 @@ void mipi_dsi_fifo_status(void)
 		MIPI_OUTP(MIPI_DSI_BASE + 0x0008, status);
 		pr_err("%s: Error: status=%x\n", __func__, status);
 		mipi_dsi_sw_reset();
+#ifdef CONFIG_FB_MSM_OVERLAY
 		mdp4_mixer_reset(0);
+#endif
 	}
 }
 

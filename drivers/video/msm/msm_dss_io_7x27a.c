@@ -159,7 +159,7 @@ static void mipi_dsi_calibration(void)
 
 #define PREF_DIV_RATIO 19
 struct dsiphy_pll_divider_config pll_divider_config;
-
+ 
 int mipi_dsi_clk_div_config(uint8 bpp, uint8 lanes,
 			    uint32 *expected_dsi_pclk)
 {

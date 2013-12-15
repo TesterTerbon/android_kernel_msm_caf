@@ -1015,7 +1015,7 @@ config FB_MSM_EBI2_PANEL_DETECT
 
 if FB_MSM_MDSS
 	source "drivers/video/msm/mdss/Kconfig"
-
+endif
 config BACKLIGHT_KTD253
 	bool "CONFIG_BACKLIGHT_KTD253"
 	default n
