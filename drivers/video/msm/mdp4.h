@@ -867,7 +867,7 @@ static inline void mdp4_dsi_cmd_del_timer(void)
 void mdp4_dsi_cmd_del_timer(void);
 #endif
 #else  /* CONFIG_FB_MSM_MIPI_DSI */
-#if 0
+
 static inline int mdp4_dsi_cmd_on(struct platform_device *pdev)
 {
 	return 0;
@@ -884,7 +884,6 @@ static inline int mdp4_dsi_video_off(struct platform_device *pdev)
 {
 	return 0;
 }
-#endif
 static inline void mdp4_primary_vsync_dsi_video(void)
 {
 }
@@ -1037,7 +1036,7 @@ int mdp4_wfd_pipe_commit(struct msm_fb_data_type *mfd, int cndx, int wait);
 #ifdef CONFIG_FB_MSM_OVERLAY
 int mdp4_unmap_sec_resource(struct msm_fb_data_type *mfd);
 #else
-static inline void mdp4_unmap_sec_resource(struct msm_fb_data_type *mfd)
+static inline void mdp4_unmap_sec_resource(struct msm_fb_data_type *mfd);
 {
 	/* empty */
 	return 0;
