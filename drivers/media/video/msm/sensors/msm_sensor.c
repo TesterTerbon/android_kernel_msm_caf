@@ -493,6 +493,8 @@ long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 {
 	struct msm_sensor_ctrl_t *s_ctrl = get_sctrl(sd);
 	void __user *argp = (void __user *)arg;
+	if (s_ctrl->sensor_state == MSM_SENSOR_POWER_DOWN)
+		return -EINVAL;
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_CFG:
 		return s_ctrl->func_tbl->sensor_config(s_ctrl, argp);
@@ -624,6 +626,35 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 				&cdata,
 				sizeof(struct sensor_cfg_data)))
 				rc = -EFAULT;
+			break;
+
+		case CFG_SENSOR_PIP_GET_CAM_MODE:
+			if (s_ctrl->func_tbl->
+			sensor_pip_get_mode == NULL) {
+				rc = 0;
+				break;
+			}
+			rc = s_ctrl->func_tbl->
+				sensor_pip_get_mode(
+				s_ctrl,
+				&cdata.cfg.pip_mode);
+
+			if (copy_to_user((void *)argp,
+				&cdata,
+				sizeof(struct sensor_cfg_data)))
+				rc = -EFAULT;
+			break;
+
+		case CFG_SENSOR_PIP_SET_CAM_MODE:
+			if (s_ctrl->func_tbl->
+				sensor_pip_set_mode == NULL) {
+					rc = 0;
+					break;
+			}
+			rc = s_ctrl->func_tbl->
+				sensor_pip_set_mode(
+				s_ctrl,
+				cdata.cfg.pip_mode);
 			break;
 
 		case CFG_START_STREAM:
@@ -832,38 +863,8 @@ int32_t msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 		return rc;
 	}
 
-	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x002C, 0x7000, MSM_CAMERA_I2C_WORD_DATA);
-    msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x002E, 0x01A6, MSM_CAMERA_I2C_WORD_DATA);    	
-	rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x0F12, &version, MSM_CAMERA_I2C_WORD_ADDR);
-#endif
-#if defined(CONFIG_S5K5CCGX)
-		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x002C, 0x7000, MSM_CAMERA_I2C_WORD_DATA);
-		msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x002E, 0x0150, MSM_CAMERA_I2C_WORD_DATA);
-		rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x0F12, &chipid, MSM_CAMERA_I2C_WORD_ADDR);
-		if (rc < 0) {
-			pr_err("%s: %s: read id failed\n", __func__,
-				s_ctrl->sensordata->sensor_name);
-			return rc;
-		}
-#endif
-	}
-
-    if(s_ctrl->sensordata->camera_type == FRONT_CAMERA_2D) {
-#if defined(CONFIG_SR030PC50) || defined(CONFIG_SR200PC20)
-    	msm_camera_i2c_write(s_ctrl->sensor_i2c_client, 0x03, 0x00, MSM_CAMERA_I2C_BYTE_DATA);
-        rc = msm_camera_i2c_read(s_ctrl->sensor_i2c_client, 0x04, &chipid, MSM_CAMERA_I2C_BYTE_ADDR);        
-    	if (rc < 0) {
-    		pr_err("%s: %s: read id failed\n", __func__,
-    			s_ctrl->sensordata->sensor_name);
-            return rc;
-    	}
-#endif
-    }
-
-    printk("msm_sensor %s id: 0x%x, version = 0x%x \n",
-        s_ctrl->sensordata->sensor_name, chipid, version);
-
-	if (chipid != s_ctrl->sensor_id_info->sensor_id || version != s_ctrl->sensor_id_info->sensor_version) {
+	CDBG("msm_sensor id: 0x%x\n", chipid);
+	if (chipid != s_ctrl->sensor_id_info->sensor_id) {
 		pr_err("msm_sensor_match_id chip id doesnot match\n");
 		return -ENODEV;
 	}
@@ -932,8 +933,8 @@ probe_fail:
 power_down:
 	if (rc > 0)
 		rc = 0;
-//kk0704.park :: Qualcomm Guide - MIPI solution don't need check sensor at boot time.
-//	s_ctrl->func_tbl->sensor_power_down(s_ctrl);
+	s_ctrl->func_tbl->sensor_power_down(s_ctrl);
+	s_ctrl->sensor_state = MSM_SENSOR_POWER_DOWN;
 	return rc;
 }
 
@@ -944,10 +945,16 @@ int32_t msm_sensor_power(struct v4l2_subdev *sd, int on)
 	struct msm_sensor_ctrl_t *s_ctrl = get_sctrl(sd);
 	mutex_lock(s_ctrl->msm_sensor_mutex);
 	if (on) {
+		if(s_ctrl->sensor_state == MSM_SENSOR_POWER_UP) {
+			pr_err("%s: sensor already in power up state\n", __func__);
+			mutex_unlock(s_ctrl->msm_sensor_mutex);
+			return -EINVAL;
+		}
 		rc = s_ctrl->func_tbl->sensor_power_up(s_ctrl);
 		if (rc < 0) {
 			pr_err("%s: %s power_up failed rc = %d\n", __func__,
 				s_ctrl->sensordata->sensor_name, rc);
+			s_ctrl->sensor_state = MSM_SENSOR_POWER_DOWN;
 		} else {
 			if (s_ctrl->func_tbl->sensor_match_id)
 				rc = s_ctrl->func_tbl->sensor_match_id(s_ctrl);
@@ -977,10 +984,18 @@ int32_t msm_sensor_power(struct v4l2_subdev *sd, int on)
 					pr_err("%s: %s power_down failed\n",
 					__func__,
 					s_ctrl->sensordata->sensor_name);
+				s_ctrl->sensor_state = MSM_SENSOR_POWER_DOWN;
 			}
+			s_ctrl->sensor_state = MSM_SENSOR_POWER_UP;
 		}
 	} else {
+		if(s_ctrl->sensor_state == MSM_SENSOR_POWER_DOWN) {
+			pr_err("%s: sensor already in power down state\n",__func__);
+			mutex_unlock(s_ctrl->msm_sensor_mutex);
+			return -EINVAL;
+		}
 		rc = s_ctrl->func_tbl->sensor_power_down(s_ctrl);
+		s_ctrl->sensor_state = MSM_SENSOR_POWER_DOWN;
 	}
 	mutex_unlock(s_ctrl->msm_sensor_mutex);
 	return rc;
