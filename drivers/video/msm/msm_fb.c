@@ -385,7 +385,6 @@ static void msm_fb_remove_sysfs(struct platform_device *pdev)
 	sysfs_remove_group(&mfd->fbi->dev->kobj, &msm_fb_attr_group);
 }
 
-static void bl_workqueue_handler(struct work_struct *work);
 
 static int msm_fb_probe(struct platform_device *pdev)
 {
@@ -431,8 +430,6 @@ static int msm_fb_probe(struct platform_device *pdev)
 		return -EPERM;
 
 	mfd = (struct msm_fb_data_type *)platform_get_drvdata(pdev);
-
-	INIT_DELAYED_WORK(&mfd->backlight_worker, bl_workqueue_handler);
 
 	if (!mfd)
 		return -ENODEV;
@@ -1985,23 +1982,6 @@ static int msm_fb_pan_display_ex(struct fb_info *info,
 	return ret;
 }
 
-static void bl_workqueue_handler(struct work_struct *work)
-{
-	struct msm_fb_data_type *mfd = container_of(to_delayed_work(work),
-				struct msm_fb_data_type, backlight_worker);
-	struct msm_fb_panel_data *pdata = mfd->pdev->dev.platform_data;
-
-	down(&mfd->sem);
-	if ((pdata) && (pdata->set_backlight) && (!bl_updated)
-					&& (mfd->panel_power_on)) {
-		mfd->bl_level = unset_bl_level;
-		pdata->set_backlight(mfd);
-		bl_level_old = unset_bl_level;
-		bl_updated = 1;
-	}
-	up(&mfd->sem);
-}
-
 static inline int rt_policy(int policy)
 {
 	if (unlikely(policy == SCHED_FIFO) ||
@@ -2158,9 +2138,6 @@ static void msm_fb_commit_wq_handler(struct work_struct *work)
 			msm_fb_pan_display_sub(var, info);
 			msm_fb_release_busy(mfd);
 		}
-		if (unset_bl_level && !bl_updated)
-			schedule_delayed_work(&mfd->backlight_worker,
-						backlight_duration);
 	}
 }
 
@@ -4171,7 +4148,7 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		if (ret)
 			return ret;
 
-		ret = msmfb_handle_pp_ioctl(mfd, &mdp_pp);
+		ret = msmfb_handle_pp_ioctl(&mdp_pp);
 		if (ret == 1)
 			ret = copy_to_user(argp, &mdp_pp, sizeof(mdp_pp));
 		break;

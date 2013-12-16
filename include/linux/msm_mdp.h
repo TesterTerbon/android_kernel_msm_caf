@@ -299,11 +299,6 @@ struct mdp_qseed_cfg {
 	uint32_t *data;
 };
 
-struct mdp_qseed_cfg_data {
-	uint32_t block;
-	struct mdp_qseed_cfg qseed_data;
-};
-
 struct mdp_sharp_cfg {
 	uint32_t flags;
 	uint32_t strength;
@@ -510,6 +505,7 @@ struct mdp_lut_cfg_data {
 
 struct mdp_qseed_cfg_data {
 	uint32_t block;
+        struct mdp_qseed_cfg qseed_data;
 	uint32_t table_num;
 	uint32_t ops;
 	uint32_t len;
