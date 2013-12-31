@@ -858,16 +858,31 @@ static void msmfb_early_resume(struct early_suspend *h)
 }
 #endif
 
+static int unset_bl_level, bl_updated;
+static int bl_level_old;
+
 void msm_fb_set_backlight(struct msm_fb_data_type *mfd, __u32 bkl_lvl)
 {
 	struct msm_fb_panel_data *pdata;
+
+	if (!mfd->panel_power_on || !bl_updated) {
+		unset_bl_level = bkl_lvl;
+		return;
+	} else {
+		unset_bl_level = 0;
+	}
 
 	pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 
 	if ((pdata) && (pdata->set_backlight)) {
 		down(&mfd->sem);
+		if (bl_level_old == bkl_lvl) {
+			up(&mfd->sem);
+			return;
+		}
 		mfd->bl_level = bkl_lvl;
 		pdata->set_backlight(mfd);
+		bl_level_old = mfd->bl_level;
 		up(&mfd->sem);
 	}
 }
@@ -915,6 +930,9 @@ static int msm_fb_blank_sub(int blank_mode, struct fb_info *info,
 			curr_pwr_state = mfd->panel_power_on;
 			down(&mfd->sem);
 			mfd->panel_power_on = FALSE;
+			bl_updated = 0;
+			up(&mfd->sem);
+			cancel_delayed_work_sync(&mfd->backlight_worker);
 
 			if (mfd->msmfb_no_update_notify_timer.function)
 				del_timer(&mfd->msmfb_no_update_notify_timer);
@@ -2102,6 +2120,10 @@ static int msm_fb_pan_display_sub(struct fb_var_screeninfo *var,
 		pr_err("%s: unmap secure res failed\n", __func__);
 #endif
 	up(&msm_fb_pan_sem);
+
+	if (unset_bl_level && !bl_updated)
+		schedule_delayed_work(&mfd->backlight_worker,
+					backlight_duration);
 
 	++mfd->panel_info.frame_count;
 	return 0;
