@@ -503,6 +503,7 @@ struct mdp_hist_lut_data {
 	uint32_t *data;
 };
 
+
 struct mdp_lut_cfg_data {
 	uint32_t lut_type;
 	union {
@@ -521,10 +522,6 @@ struct mdp_qseed_cfg_data {
 	uint32_t *data;
 };
 
-struct mdp_bl_scale_data {
-	uint32_t min_lvl;
-	uint32_t scale;
-};
 
 struct mdp_calib_config_data {
 	uint32_t ops;
@@ -544,7 +541,6 @@ enum {
 	mdp_op_qseed_cfg,
 	mdp_op_calib_cfg,
 	mdp_op_pa_cfg,
-	mdp_bl_scale_cfg,
 	mdp_op_max,
 };
 
@@ -555,7 +551,6 @@ struct msmfb_mdp_pp {
 		struct mdp_csc_cfg_data csc_cfg_data;
 		struct mdp_lut_cfg_data lut_cfg_data;
 		struct mdp_qseed_cfg_data qseed_cfg_data;
-		struct mdp_bl_scale_data bl_scale_data;
 		struct mdp_calib_config_data calib_cfg;
 		struct mdp_pa_cfg_data pa_cfg_data;
 	} data;
