@@ -2101,8 +2101,10 @@ static int msm_fb_pan_display_sub(struct fb_var_screeninfo *var,
 
 	mdp_dma_pan_update(info);
 	msm_fb_signal_timeline(mfd);
+#ifdef CONFIG_FB_MSM_MDP40
 	if (mdp4_unmap_sec_resource(mfd))
 		pr_err("%s: unmap secure res failed\n", __func__);
+#endif
 
 	up(&msm_fb_pan_sem);
 
@@ -2136,10 +2138,13 @@ static void msm_fb_commit_wq_handler(struct work_struct *work)
 	mfd = container_of(work, struct msm_fb_data_type, commit_work);
 	fb_backup = (struct msm_fb_backup_type *)mfd->msm_fb_backup;
 	info = &fb_backup->info;
+#ifdef CONFIG_FB_MSM_OVERLAY
 	if (fb_backup->disp_commit.flags &
 		MDP_DISPLAY_COMMIT_OVERLAY) {
 			mdp4_overlay_commit(info);
-	} else {
+	} else
+#endif
+	{
 		var = &fb_backup->disp_commit.var;
 		msm_fb_pan_display_sub(var, info);
 	}
